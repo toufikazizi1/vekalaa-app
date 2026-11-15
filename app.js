@@ -133,7 +133,7 @@ $("close").onclick = () => $("auth").close();
 $("go").onclick = async () => {
   $("msg").textContent = "";
   if (!st.user) return $("auth").showModal();
-  if (!st.sel) return ($("msg").textContent = "اختر وكيلاً أولاً");
+  if (!st.sel) { $("agents").scrollIntoView({ behavior: "smooth" }); return ($("msg").textContent = "اضغط على وكيل من الأعلى أولاً"); }
   const prompt = $("prompt").value.trim();
   if (!prompt) return ($("msg").textContent = "اكتب وصفاً");
   $("go").disabled = true;
@@ -149,5 +149,8 @@ $("go").onclick = async () => {
 be.onAuthChange(user => { st.user = user; load(); });
 
 renderChips();
-st.agents = await be.agents(); renderAgents();
+st.agents = await be.agents();
+const first = st.agents.find(a => a.tier !== "premium") || st.agents[0];
+if (first) { st.sel = first.id; $("sel").textContent = `الوكيل: ${first.icon} ${first.name}`; }
+renderAgents();
 st.user = await be.init(); load();
