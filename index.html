@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>وكلاء الذكاء</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e1015">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+</head>
+<body>
+<header>
+  <b class="logo">◆ وكلاء الذكاء</b>
+  <div id="userbox"></div>
+</header>
+
+<div class="layout">
+  <aside>
+    <h3>سجلّ أعمالك</h3>
+    <div id="history"></div>
+  </aside>
+
+  <main>
+    <div id="demo" class="box" hidden>🧪 <b>وضع تجريبي:</b> كل شيء محفوظ في جهازك فقط. اربط Supabase من ملف config.js للنسخة الحقيقية.</div>
+
+    <section class="hero">
+      <h1>وكلاء ذكاء جاهزون لمهمتك</h1>
+      <p class="muted">صور، فيديو، مجسمات 3D ونصوص — اختر وكيلاً واكتب ما تريد. حصة مجانية كل يوم.</p>
+    </section>
+
+    <section>
+      <div id="chips" class="chips"></div>
+      <div id="agents" class="grid"></div>
+    </section>
+
+    <section class="box">
+      <div id="sel" class="muted">اختر وكيلاً من الأعلى</div>
+      <textarea id="prompt" rows="3" maxlength="1500" placeholder="اكتب وصف ما تريده..."></textarea>
+      <div class="row">
+        <button id="go" class="primary">توليد</button>
+        <span id="msg" class="muted"></span>
+      </div>
+    </section>
+
+    <section>
+      <h2>النتائج</h2>
+      <div id="results"></div>
+    </section>
+  </main>
+</div>
+
+<dialog id="auth">
+  <form method="dialog" id="authform">
+    <h2>الدخول</h2>
+    <input id="email" type="email" placeholder="البريد الإلكتروني" required>
+    <input id="pw" type="password" placeholder="كلمة السر (6 أحرف+)" required minlength="6">
+    <div id="autherr" class="err"></div>
+    <div class="row">
+      <button type="button" id="login" class="primary">دخول</button>
+      <button type="button" id="register">حساب جديد</button>
+      <button type="button" id="close">إغلاق</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="upgrade">
+  <h2>👑 ميزة للمشتركين</h2>
+  <p id="upmsg" class="muted"></p>
+  <div id="upactions" class="row"></div>
+</dialog>
+<script type="module" src="app.js"></script>
+<script>if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
+</body>
+</html>
