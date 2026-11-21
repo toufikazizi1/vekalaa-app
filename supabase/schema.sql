@@ -156,11 +156,21 @@ on conflict (id) do nothing;
 insert into public.agents (id, name, icon, type, tier, provider, free_daily, pro_daily, description, sort) values
   ('image',    'صانع الصور',      '🖼️', 'image',   'free',    'pollinations', 10, 100, 'يحوّل وصفك إلى صورة.', 1),
   ('logo',     'مصمم الشعارات',   '✨', 'image',   'free',    'pollinations', 5,  50,  'شعارات بسيطة وأنيقة لمشروعك.', 2),
-  ('image_hd', 'صور HD',          '🌟', 'image',   'premium', 'auto',         0,  50,  'جودة أعلى وسرعة أكبر.', 3),
-  ('video',    'صانع الفيديو',    '🎬', 'video',   'premium', 'auto',         0,  10,  'فيديو قصير من وصف نصي.', 4),
-  ('model3d',  'مجسمات 3D',       '🧊', 'model3d', 'premium', 'auto',         0,  10,  'مجسم ثلاثي الأبعاد تدوّره وتعاينه.', 5),
-  ('ads',      'كاتب إعلانات',    '📣', 'text',    'premium', 'auto',         0,  300, 'نصوص إعلانية بالعربية جاهزة للنشر.', 6),
-  ('chat',     'مساعد عام',       '💬', 'text',    'premium', 'auto',         0,  300, 'اسأل أي سؤال.', 7)
+  ('cartoon3d', 'كرتون 3D', '🧸', 'image', 'free', 'pollinations', 8, 80, 'شخصيات كرتونية ثلاثية الأبعاد بستايل أفلام الأطفال.', 3),
+  ('anime', 'أنمي', '🎌', 'image', 'free', 'pollinations', 8, 80, 'رسومات بستايل الأنمي الياباني.', 4),
+  ('photo', 'صور واقعية', '📷', 'image', 'free', 'pollinations', 8, 80, 'صور تشبه التصوير الحقيقي.', 5),
+  ('wallpaper', 'خلفيات هاتف', '📱', 'image', 'free', 'pollinations', 8, 80, 'خلفيات جميلة لشاشة هاتفك.', 6),
+  ('sticker', 'ملصقات', '🏷️', 'image', 'free', 'pollinations', 8, 80, 'ستيكرات لطيفة جاهزة للمحادثات.', 7),
+  ('appicon', 'أيقونات تطبيقات', '🎮', 'image', 'free', 'pollinations', 5, 50, 'أيقونات لتطبيقاتك وألعابك.', 8),
+  ('coloring', 'تلوين للأطفال', '🖍️', 'image', 'free', 'pollinations', 5, 50, 'صفحات تلوين بخطوط بسيطة.', 9),
+  ('art', 'لوحات فنية', '🎨', 'image', 'free', 'pollinations', 8, 80, 'رسم زيتي ولوحات فنية.', 10),
+  ('product', 'تصميم منتجات', '📦', 'image', 'free', 'pollinations', 5, 50, 'عرض منتج أو علبة بشكل احترافي.', 11),
+  ('cover', 'أغلفة يوتيوب', '📺', 'image', 'free', 'pollinations', 5, 50, 'أغلفة جذابة لفيديوهاتك وصفحاتك.', 12),
+  ('image_hd', 'صور HD', '🌟', 'image', 'premium', 'auto', 0, 50, 'جودة أعلى وسرعة أكبر.', 13),
+  ('video', 'صانع الفيديو', '🎬', 'video', 'premium', 'auto', 0, 10, 'فيديو قصير من وصف نصي.', 14),
+  ('model3d', 'مجسمات 3D', '🧊', 'model3d', 'premium', 'auto', 0, 10, 'مجسم ثلاثي الأبعاد تدوّره وتعاينه.', 15),
+  ('ads', 'كاتب إعلانات', '📣', 'text', 'premium', 'auto', 0, 300, 'نصوص إعلانية بالعربية جاهزة للنشر.', 16),
+  ('chat', 'مساعد عام', '💬', 'text', 'premium', 'auto', 0, 300, 'اسأل أي سؤال.', 17)
 on conflict (id) do update set name=excluded.name, icon=excluded.icon, type=excluded.type, tier=excluded.tier,
   provider=excluded.provider, free_daily=excluded.free_daily, pro_daily=excluded.pro_daily,
   description=excluded.description, sort=excluded.sort;
@@ -172,5 +182,15 @@ insert into public.agent_private (agent_id, system, prefix) values
   ('video', null, ''),
   ('model3d', null, ''),
   ('ads', 'أنت كاتب إعلانات محترف. اكتب بالعربية الفصحى المبسطة. أعط 3 صيغ قصيرة ومقنعة مع عنوان لكل واحدة. بدون مقدمات.', ''),
-  ('chat', 'أنت مساعد مفيد. أجب بإيجاز وبنفس لغة المستخدم.', '')
+  ('chat', 'أنت مساعد مفيد. أجب بإيجاز وبنفس لغة المستخدم.', ''),
+  ('cartoon3d', null, 'cute 3D animated movie character, Pixar style, soft lighting, big expressive eyes, vibrant colors, high detail render, '),
+  ('anime', null, 'anime style illustration, detailed, vibrant colors, studio quality, '),
+  ('photo', null, 'ultra realistic photograph, natural lighting, sharp focus, 50mm lens, high detail, '),
+  ('wallpaper', null, 'beautiful phone wallpaper, aesthetic, high quality, clean composition, '),
+  ('sticker', null, 'die-cut sticker design, cute, thick white outline, flat colors, white background, '),
+  ('appicon', null, 'mobile app icon, rounded square, glossy, centered symbol, clean gradient background, '),
+  ('coloring', null, 'children''s coloring book page, black and white line art, thick clean outlines, no shading, white background, '),
+  ('art', null, 'beautiful oil painting, artistic brush strokes, rich colors, gallery quality, '),
+  ('product', null, 'professional product photography, studio lighting, clean background, commercial advertising shot, '),
+  ('cover', null, 'eye-catching social media thumbnail background, bold colors, dramatic lighting, high contrast, ')
 on conflict (agent_id) do nothing;
