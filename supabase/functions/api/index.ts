@@ -66,6 +66,9 @@ async function start(agent: any, priv: any, prompt: string): Promise<{ result?: 
   const full = (priv?.prefix || "") + prompt;
 
   // مجاني: الصورة تُحمَّل من متصفح المستخدم نفسه (لا يمر عبر السيرفر ولا تكلفة عليك)
+  if (agent.provider === "puter") {
+    return { result: { kind: agent.type, puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, 450) } };
+  }
   if (agent.provider === "pollinations") {
     return { result: { kind: "image", puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, 450) } };
   }

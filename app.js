@@ -74,16 +74,21 @@ function renderAgents() {
 
 const imgCache = {};
 // الصور المجانية عبر Puter.js: تُولَّد في متصفح المستخدم وتُحسب على حسابه المجاني عندهم (لا تكلفة عليك)
-function puterImage(j, r) {
+function puterMedia(j, r) {
   if (imgCache[j.id]) return imgCache[j.id];
   const w = imgCache[j.id] = el("div", { className: "muted", textContent: "جارٍ التوليد… (أول مرة قد تظهر نافذة لإنشاء حساب Puter مجاني، وافق عليها)" });
   const fail = msg => { w.className = "err"; w.replaceChildren(msg + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } })); };
   if (!window.puter) { fail("تعذر تحميل خدمة الصور."); return w; }
-  window.puter.ai.txt2img(r.prompt, { model: "black-forest-labs/flux-schnell" }).then(img => {
-    img.alt = j.prompt; img.style.maxWidth = "100%"; img.style.borderRadius = "10px";
-    w.className = ""; w.replaceChildren(img, el("a", { href: img.src, target: "_blank", rel: "noopener", download: "image.png", textContent: " فتح / تحميل" }));
-    if (img.src.startsWith("data:image/") && img.src.length < 700000) be.setResult?.(j.id, { kind: "image", url: img.src });
-  }).catch(e => fail("فشل التوليد: " + (e?.error?.message || e?.message || "سجّل الدخول في Puter وأعد المحاولة") + "."));
+  const isVideo = r.kind === "video";
+  const run = isVideo ? window.puter.ai.txt2vid(r.prompt, { model: "togetherai:wan-ai/wan2.7-t2v" }) : window.puter.ai.txt2img(r.prompt, { model: "black-forest-labs/flux-schnell" });
+  if (isVideo) w.textContent = "جارٍ توليد الفيديو… قد ياخذ من نصف دقيقة إلى بضع دقائق. ما تغلقش الصفحة.";
+  run.then(m => {
+    m.alt = j.prompt; m.style.maxWidth = "100%"; m.style.borderRadius = "10px";
+    if (isVideo) { m.controls = true; m.loop = true; }
+    const src = String(m.src || m);
+    w.className = ""; w.replaceChildren(m, el("a", { href: src, target: "_blank", rel: "noopener", textContent: " فتح / تحميل" }));
+    if (src.startsWith("https://") || (src.startsWith("data:image/") && src.length < 700000)) be.setResult?.(j.id, { kind: r.kind, url: src });
+  }).catch(e => fail("فشل التوليد: " + (e?.error?.message || e?.message || e?.code || "سجّل الدخول في Puter وتأكد من رصيدك") + "."));
   return w;
 }
 
@@ -96,7 +101,7 @@ function renderJob(j) {
   if (j.status === "failed") card.append(el("div", { className: "err", textContent: (j.error || "") + " — لم تُحسب من حصتك اليومية" }));
   if (r) {
     const u = safeUrl(r.url);
-    if (r.kind === "image" && r.puter) card.append(puterImage(j, r));
+    if (r.puter) card.append(puterMedia(j, r));
     else if (r.kind === "image" && u) {
       // الخدمة المجانية (Pollinations) تسمح بصورة كل ~45 ثانية: نعيد المحاولة تلقائياً بدل إظهار خطأ
       const img = el("img", { alt: j.prompt });

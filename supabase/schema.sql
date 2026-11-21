@@ -19,12 +19,14 @@ create table if not exists public.agents (
   tier text not null default 'free' check (tier in ('free','premium')),
   free_daily integer not null default 5,   -- الحصة اليومية للمجاني
   pro_daily integer not null default 50,   -- الحصة اليومية للمشترك
-  provider text not null default 'auto' check (provider in ('auto','pollinations')),  -- pollinations = مجاني، يُحمَّل من متصفح المستخدم
+  provider text not null default 'auto' check (provider in ('auto','pollinations','puter')),  -- pollinations = مجاني، يُحمَّل من متصفح المستخدم
   description text,
   sort integer not null default 0,
   active boolean not null default true
 );
 alter table public.agents add column if not exists provider text not null default 'auto';
+alter table public.agents drop constraint if exists agents_provider_check;
+alter table public.agents add constraint agents_provider_check check (provider in ('auto','pollinations','puter'));
 
 -- تعليمات الوكيل سرّية: لا يقرأها إلا الـ Edge Function
 create table if not exists public.agent_private (
@@ -156,21 +158,22 @@ on conflict (id) do nothing;
 insert into public.agents (id, name, icon, type, tier, provider, free_daily, pro_daily, description, sort) values
   ('image',    'صانع الصور',      '🖼️', 'image',   'free',    'pollinations', 10, 100, 'يحوّل وصفك إلى صورة.', 1),
   ('logo',     'مصمم الشعارات',   '✨', 'image',   'free',    'pollinations', 5,  50,  'شعارات بسيطة وأنيقة لمشروعك.', 2),
-  ('cartoon3d', 'كرتون 3D', '🧸', 'image', 'free', 'pollinations', 8, 80, 'شخصيات كرتونية ثلاثية الأبعاد بستايل أفلام الأطفال.', 3),
-  ('anime', 'أنمي', '🎌', 'image', 'free', 'pollinations', 8, 80, 'رسومات بستايل الأنمي الياباني.', 4),
-  ('photo', 'صور واقعية', '📷', 'image', 'free', 'pollinations', 8, 80, 'صور تشبه التصوير الحقيقي.', 5),
-  ('wallpaper', 'خلفيات هاتف', '📱', 'image', 'free', 'pollinations', 8, 80, 'خلفيات جميلة لشاشة هاتفك.', 6),
-  ('sticker', 'ملصقات', '🏷️', 'image', 'free', 'pollinations', 8, 80, 'ستيكرات لطيفة جاهزة للمحادثات.', 7),
-  ('appicon', 'أيقونات تطبيقات', '🎮', 'image', 'free', 'pollinations', 5, 50, 'أيقونات لتطبيقاتك وألعابك.', 8),
-  ('coloring', 'تلوين للأطفال', '🖍️', 'image', 'free', 'pollinations', 5, 50, 'صفحات تلوين بخطوط بسيطة.', 9),
-  ('art', 'لوحات فنية', '🎨', 'image', 'free', 'pollinations', 8, 80, 'رسم زيتي ولوحات فنية.', 10),
-  ('product', 'تصميم منتجات', '📦', 'image', 'free', 'pollinations', 5, 50, 'عرض منتج أو علبة بشكل احترافي.', 11),
-  ('cover', 'أغلفة يوتيوب', '📺', 'image', 'free', 'pollinations', 5, 50, 'أغلفة جذابة لفيديوهاتك وصفحاتك.', 12),
-  ('image_hd', 'صور HD', '🌟', 'image', 'premium', 'auto', 0, 50, 'جودة أعلى وسرعة أكبر.', 13),
-  ('video', 'صانع الفيديو', '🎬', 'video', 'premium', 'auto', 0, 10, 'فيديو قصير من وصف نصي.', 14),
-  ('model3d', 'مجسمات 3D', '🧊', 'model3d', 'premium', 'auto', 0, 10, 'مجسم ثلاثي الأبعاد تدوّره وتعاينه.', 15),
-  ('ads', 'كاتب إعلانات', '📣', 'text', 'premium', 'auto', 0, 300, 'نصوص إعلانية بالعربية جاهزة للنشر.', 16),
-  ('chat', 'مساعد عام', '💬', 'text', 'premium', 'auto', 0, 300, 'اسأل أي سؤال.', 17)
+  ('video_free', 'فيديو أطفال 3D', '🎬', 'video', 'free', 'puter', 2, 20, 'فيديو قصير بستايل كرتون 3D (يُحسب من رصيدك المجاني في Puter).', 3),
+  ('cartoon3d', 'كرتون 3D', '🧸', 'image', 'free', 'pollinations', 8, 80, 'شخصيات كرتونية ثلاثية الأبعاد بستايل أفلام الأطفال.', 4),
+  ('anime', 'أنمي', '🎌', 'image', 'free', 'pollinations', 8, 80, 'رسومات بستايل الأنمي الياباني.', 5),
+  ('photo', 'صور واقعية', '📷', 'image', 'free', 'pollinations', 8, 80, 'صور تشبه التصوير الحقيقي.', 6),
+  ('wallpaper', 'خلفيات هاتف', '📱', 'image', 'free', 'pollinations', 8, 80, 'خلفيات جميلة لشاشة هاتفك.', 7),
+  ('sticker', 'ملصقات', '🏷️', 'image', 'free', 'pollinations', 8, 80, 'ستيكرات لطيفة جاهزة للمحادثات.', 8),
+  ('appicon', 'أيقونات تطبيقات', '🎮', 'image', 'free', 'pollinations', 5, 50, 'أيقونات لتطبيقاتك وألعابك.', 9),
+  ('coloring', 'تلوين للأطفال', '🖍️', 'image', 'free', 'pollinations', 5, 50, 'صفحات تلوين بخطوط بسيطة.', 10),
+  ('art', 'لوحات فنية', '🎨', 'image', 'free', 'pollinations', 8, 80, 'رسم زيتي ولوحات فنية.', 11),
+  ('product', 'تصميم منتجات', '📦', 'image', 'free', 'pollinations', 5, 50, 'عرض منتج أو علبة بشكل احترافي.', 12),
+  ('cover', 'أغلفة يوتيوب', '📺', 'image', 'free', 'pollinations', 5, 50, 'أغلفة جذابة لفيديوهاتك وصفحاتك.', 13),
+  ('image_hd', 'صور HD', '🌟', 'image', 'premium', 'auto', 0, 50, 'جودة أعلى وسرعة أكبر.', 14),
+  ('video', 'صانع الفيديو', '🎬', 'video', 'premium', 'auto', 0, 10, 'فيديو قصير من وصف نصي.', 15),
+  ('model3d', 'مجسمات 3D', '🧊', 'model3d', 'premium', 'auto', 0, 10, 'مجسم ثلاثي الأبعاد تدوّره وتعاينه.', 16),
+  ('ads', 'كاتب إعلانات', '📣', 'text', 'premium', 'auto', 0, 300, 'نصوص إعلانية بالعربية جاهزة للنشر.', 17),
+  ('chat', 'مساعد عام', '💬', 'text', 'premium', 'auto', 0, 300, 'اسأل أي سؤال.', 18)
 on conflict (id) do update set name=excluded.name, icon=excluded.icon, type=excluded.type, tier=excluded.tier,
   provider=excluded.provider, free_daily=excluded.free_daily, pro_daily=excluded.pro_daily,
   description=excluded.description, sort=excluded.sort;
@@ -183,6 +186,7 @@ insert into public.agent_private (agent_id, system, prefix) values
   ('model3d', null, ''),
   ('ads', 'أنت كاتب إعلانات محترف. اكتب بالعربية الفصحى المبسطة. أعط 3 صيغ قصيرة ومقنعة مع عنوان لكل واحدة. بدون مقدمات.', ''),
   ('chat', 'أنت مساعد مفيد. أجب بإيجاز وبنفس لغة المستخدم.', ''),
+  ('video_free', null, 'cute 3D animated children''s video, Pixar style, soft lighting, vibrant colors, smooth motion, '),
   ('cartoon3d', null, 'cute 3D animated movie character, Pixar style, soft lighting, big expressive eyes, vibrant colors, high detail render, '),
   ('anime', null, 'anime style illustration, detailed, vibrant colors, studio quality, '),
   ('photo', null, 'ultra realistic photograph, natural lighting, sharp focus, 50mm lens, high detail, '),

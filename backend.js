@@ -46,6 +46,7 @@ export function createSupabaseBackend(sb) {
 const DEMO_AGENTS = [
   { id: "image", name: "صانع الصور", icon: "🖼️", type: "image", tier: "free", provider: "pollinations", free_daily: 10, pro_daily: 100, description: "يحوّل وصفك إلى صورة." },
   { id: "logo", name: "مصمم الشعارات", icon: "✨", type: "image", tier: "free", provider: "pollinations", free_daily: 5, pro_daily: 50, description: "شعارات بسيطة وأنيقة لمشروعك.", prefix: "minimal modern vector logo, flat design, white background, " },
+  { id: "video_free", name: "فيديو أطفال 3D", icon: "🎬", type: "video", tier: "free", provider: "puter", free_daily: 2, pro_daily: 20, description: "فيديو قصير بستايل كرتون 3D (يُحسب من رصيدك المجاني في Puter).", prefix: "cute 3D animated children's video, Pixar style, soft lighting, vibrant colors, smooth motion, " },
   { id: "cartoon3d", name: "كرتون 3D", icon: "🧸", type: "image", tier: "free", provider: "pollinations", free_daily: 8, pro_daily: 80, description: "شخصيات كرتونية ثلاثية الأبعاد بستايل أفلام الأطفال.", prefix: "cute 3D animated movie character, Pixar style, soft lighting, big expressive eyes, vibrant colors, high detail render, " },
   { id: "anime", name: "أنمي", icon: "🎌", type: "image", tier: "free", provider: "pollinations", free_daily: 8, pro_daily: 80, description: "رسومات بستايل الأنمي الياباني.", prefix: "anime style illustration, detailed, vibrant colors, studio quality, " },
   { id: "photo", name: "صور واقعية", icon: "📷", type: "image", tier: "free", provider: "pollinations", free_daily: 8, pro_daily: 80, description: "صور تشبه التصوير الحقيقي.", prefix: "ultra realistic photograph, natural lighting, sharp focus, 50mm lens, high detail, " },
@@ -109,7 +110,9 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       if (a.tier === "premium" && !state.pro) fail("هذا الوكيل للمشتركين فقط", "premium");
       if (usedToday(a.id) >= (state.pro ? a.pro_daily : a.free_daily)) fail("وصلت حدك اليومي لهذا الوكيل", "quota");
       let result;
-      if (a.provider === "pollinations") {
+      if (a.provider === "puter") {
+        result = { kind: a.type, puter: true, prompt: (a.prefix || "") + prompt.slice(0, 450) };
+      } else if (a.provider === "pollinations") {
         const full = (a.prefix || "") + prompt.slice(0, 450); // روابط الصور لها حد طول
         result = { kind: "image", puter: true, prompt: full };
       } else if (a.type === "image") result = { kind: "image", url: mockImage(prompt), mock: true };
