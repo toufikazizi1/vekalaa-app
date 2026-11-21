@@ -158,7 +158,7 @@ on conflict (id) do nothing;
 insert into public.agents (id, name, icon, type, tier, provider, free_daily, pro_daily, description, sort) values
   ('image',    'صانع الصور',      '🖼️', 'image',   'free',    'pollinations', 10, 100, 'يحوّل وصفك إلى صورة.', 1),
   ('logo',     'مصمم الشعارات',   '✨', 'image',   'free',    'pollinations', 5,  50,  'شعارات بسيطة وأنيقة لمشروعك.', 2),
-  ('video_free', 'فيديو أطفال 3D', '🎬', 'video', 'free', 'puter', 2, 20, 'فيديو قصير بستايل كرتون 3D (يُحسب من رصيدك المجاني في Puter).', 3),
+  ('video_free', 'فيديو أطفال 3D', '🎬', 'video', 'free', 'puter', 10, 10, 'فيديو قصير بستايل كرتون 3D (يُحسب من رصيدك المجاني في Puter).', 3),
   ('cartoon3d', 'كرتون 3D', '🧸', 'image', 'free', 'pollinations', 8, 80, 'شخصيات كرتونية ثلاثية الأبعاد بستايل أفلام الأطفال.', 4),
   ('anime', 'أنمي', '🎌', 'image', 'free', 'pollinations', 8, 80, 'رسومات بستايل الأنمي الياباني.', 5),
   ('photo', 'صور واقعية', '📷', 'image', 'free', 'pollinations', 8, 80, 'صور تشبه التصوير الحقيقي.', 6),
@@ -169,14 +169,15 @@ insert into public.agents (id, name, icon, type, tier, provider, free_daily, pro
   ('art', 'لوحات فنية', '🎨', 'image', 'free', 'pollinations', 8, 80, 'رسم زيتي ولوحات فنية.', 11),
   ('product', 'تصميم منتجات', '📦', 'image', 'free', 'pollinations', 5, 50, 'عرض منتج أو علبة بشكل احترافي.', 12),
   ('cover', 'أغلفة يوتيوب', '📺', 'image', 'free', 'pollinations', 5, 50, 'أغلفة جذابة لفيديوهاتك وصفحاتك.', 13),
-  ('image_hd', 'صور HD', '🌟', 'image', 'premium', 'puter', 0, 50, 'جودة أعلى وسرعة أكبر.', 14),
-  ('video', 'صانع الفيديو', '🎬', 'video', 'premium', 'auto', 0, 10, 'فيديو قصير من وصف نصي.', 15),
-  ('model3d', 'مجسمات 3D', '🧊', 'model3d', 'premium', 'auto', 0, 10, 'مجسم ثلاثي الأبعاد تدوّره وتعاينه.', 16),
-  ('ads', 'كاتب إعلانات', '📣', 'text', 'premium', 'puter', 0, 300, 'نصوص إعلانية بالعربية جاهزة للنشر.', 17),
-  ('chat', 'مساعد عام', '💬', 'text', 'premium', 'puter', 0, 300, 'اسأل أي سؤال.', 18)
+  ('image_hd', 'صور HD', '🌟', 'image', 'free', 'puter', 50, 50, 'جودة أعلى وسرعة أكبر.', 14),
+  ('ads', 'كاتب إعلانات', '📣', 'text', 'free', 'puter', 50, 50, 'نصوص إعلانية بالعربية جاهزة للنشر.', 17),
+  ('chat', 'مساعد عام', '💬', 'text', 'free', 'puter', 50, 50, 'اسأل أي سؤال.', 18)
 on conflict (id) do update set name=excluded.name, icon=excluded.icon, type=excluded.type, tier=excluded.tier,
   provider=excluded.provider, free_daily=excluded.free_daily, pro_daily=excluded.pro_daily,
   description=excluded.description, sort=excluded.sort;
+
+-- الوكلاء القدامى التي تحتاج تكلفة حقيقية: نعطّلها (كل شيء مجاني الآن)
+update public.agents set active = false where id in ('video','model3d');
 
 insert into public.agent_private (agent_id, system, prefix) values
   ('image', null, ''),

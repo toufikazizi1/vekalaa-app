@@ -33,9 +33,7 @@ function renderUser() {
   const b = $("userbox"); b.replaceChildren();
   if (st.user) {
     if (st.points != null) b.append(el("span", { className: "plan pro", textContent: "💎 " + st.points.toLocaleString("en-US") }));
-    b.append(el("span", { className: "muted", textContent: st.user.email }),
-      el("span", { className: "plan " + (st.isPro ? "pro" : "free"), textContent: st.isPro ? "PRO 👑" : "مجاني" }));
-    if (!st.isPro) b.append(el("button", { textContent: "ترقية", onclick: () => showUpgrade("اشترك للوصول إلى الوكلاء المميزة وحصص أكبر.") }));
+    b.append(el("span", { className: "muted", textContent: st.user.email }));
     b.append(el("button", { textContent: "خروج", onclick: () => be.signOut() }));
   } else b.append(el("button", { className: "primary", textContent: "دخول / تسجيل", onclick: () => $("auth").showModal() }));
 }
@@ -66,7 +64,7 @@ function renderAgents() {
       el("span", { className: "left", textContent: info }));
     c.onclick = () => {
       if (s.locked) return showUpgrade(`«${a.name}» متاح للمشتركين فقط.`);
-      st.sel = a.id; $("sel").textContent = `الوكيل: ${a.icon} ${a.name}`; renderAgents();
+      st.sel = a.id; $("vopts").hidden = a.type !== "video"; $("sel").textContent = `الوكيل: ${a.icon} ${a.name}`; renderAgents();
     };
     g.append(c);
   }
@@ -90,7 +88,7 @@ function puterMedia(j, r) {
     catch { return p; }
   };
   const run = isText ? P.chat(r.system ? [{ role: "system", content: r.system }, { role: "user", content: r.prompt }] : r.prompt)
-    : (async () => { const en = await toEnglish(r.prompt); return isVideo ? P.txt2vid(en, { model: "togetherai:wan-ai/wan2.7-t2v" }) : P.txt2img(en, { model: r.model || "black-forest-labs/flux-schnell" }); })();
+    : (async () => { const en = await toEnglish(r.prompt); return isVideo ? P.txt2vid(en, { model: "togetherai:wan-ai/wan2.7-t2v", ...(r.seconds ? { seconds: r.seconds } : {}), ...(r.size ? { size: r.size } : {}) }) : P.txt2img(en, { model: r.model || "black-forest-labs/flux-schnell" }); })();
   if (isVideo) w.textContent = "جارٍ توليد الفيديو… قد ياخذ من نصف دقيقة إلى بضع دقائق. ما تغلقش الصفحة.";
   run.then(m => {
     if (isText) {
@@ -190,7 +188,7 @@ $("go").onclick = async () => {
   const prompt = $("prompt").value.trim();
   if (!prompt) return ($("msg").textContent = "اكتب وصفاً");
   $("go").disabled = true;
-  try { await be.generate(st.sel, prompt); $("prompt").value = ""; await load(); }
+  try { await be.generate(st.sel, prompt, { seconds: $("vsec").value, size: $("vori").value }); $("prompt").value = ""; await load(); }
   catch (e) {
     if (e.code === "premium") showUpgrade(e.message);
     else if (e.code === "quota") { $("msg").textContent = e.message + " — يتجدد غداً."; if (!st.isPro) showUpgrade(e.message + ". اشترك لحصص أكبر."); }
@@ -204,6 +202,6 @@ be.onAuthChange(user => { st.user = user; load(); });
 renderChips();
 st.agents = await be.agents();
 const first = st.agents.find(a => a.tier !== "premium") || st.agents[0];
-if (first) { st.sel = first.id; $("sel").textContent = `الوكيل: ${first.icon} ${first.name}`; }
+if (first) { st.sel = first.id; $("vopts").hidden = first.type !== "video"; $("sel").textContent = `الوكيل: ${first.icon} ${first.name}`; }
 renderAgents();
 st.user = await be.init(); load();

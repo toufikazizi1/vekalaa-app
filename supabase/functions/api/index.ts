@@ -62,12 +62,14 @@ async function store(url: string, userId: string, fallbackExt: string) {
 }
 
 // ---------- بدء التوليد ----------
-async function start(agent: any, priv: any, prompt: string): Promise<{ result?: any; provider?: any }> {
+async function start(agent: any, priv: any, prompt: string, opts: any = {}): Promise<{ result?: any; provider?: any }> {
   const full = (priv?.prefix || "") + prompt;
 
   // مجاني: الصورة تُحمَّل من متصفح المستخدم نفسه (لا يمر عبر السيرفر ولا تكلفة عليك)
   if (agent.provider === "puter") {
-    return { result: { kind: agent.type, puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, agent.type === "text" ? 1500 : 450), system: priv?.system || undefined, model: agent.id === "image_hd" ? "black-forest-labs/flux-2-pro" : undefined } };
+    return { result: { kind: agent.type, puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, agent.type === "text" ? 1500 : 450), system: priv?.system || undefined, model: agent.id === "image_hd" ? "black-forest-labs/flux-2-pro" : undefined,
+      seconds: agent.type === "video" ? ([5, 10, 15].includes(+opts?.seconds) ? +opts.seconds : 5) : undefined,
+      size: agent.type === "video" ? (opts?.size === "1280x720" ? "1280x720" : "720x1280") : undefined } };
   }
   if (agent.provider === "pollinations") {
     return { result: { kind: "image", puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, 450) } };
@@ -178,7 +180,7 @@ async function generate(user: any, body: any) {
   try {
     const { data: agent } = await sb.from("agents").select("*").eq("id", agentId).single();
     const { data: priv } = await sb.from("agent_private").select("*").eq("agent_id", agentId).maybeSingle();
-    const out = await start(agent, priv, prompt);
+    const out = await start(agent, priv, prompt, body.opts);
     if (out.result) await finish(job.id, out.result);
     else await sb.from("jobs").update({ provider: out.provider }).eq("id", job.id);
   } catch (e) {
