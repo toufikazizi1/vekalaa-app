@@ -71,6 +71,17 @@ function renderAgents() {
 }
 
 
+function playlist(urls) {
+  const box = el("div", {});
+  const v = el("video", { src: urls[0], controls: true, playsInline: true, style: "max-width:100%;border-radius:10px" });
+  let i = 0;
+  const label = el("div", { className: "muted", textContent: `المقطع 1 / ${urls.length}` });
+  v.onended = () => { if (i + 1 < urls.length) { i++; v.src = urls[i]; label.textContent = `المقطع ${i + 1} / ${urls.length}`; v.play().catch(() => {}); } };
+  v.onerror = () => { label.className = "err"; label.textContent = "انتهت صلاحية روابط الفيديو. حمّل المقاطع فور ما تنتهي."; };
+  box.append(v, label, el("div", { className: "row" }, ...urls.map((u, k) => el("a", { href: u, target: "_blank", rel: "noopener", download: `clip_${k + 1}.mp4`, textContent: `تحميل ${k + 1}` }))));
+  return box;
+}
+
 const imgCache = {};
 // الصور المجانية عبر Puter.js: تُولَّد في متصفح المستخدم وتُحسب على حسابه المجاني عندهم (لا تكلفة عليك)
 function puterMedia(j, r) {
@@ -87,6 +98,7 @@ function puterMedia(j, r) {
     try { return textOf(await P.chat([{ role: "system", content: "Translate the user's text to English. Output only the translation, nothing else." }, { role: "user", content: p }])).trim() || p; }
     catch { return p; }
   };
+  if (isVideo && r.clips > 1) { longVideo(j, r, w, P, textOf, toEnglish, fail); return w; }
   const run = isText ? P.chat(r.system ? [{ role: "system", content: r.system }, { role: "user", content: r.prompt }] : r.prompt)
     : (async () => { const en = await toEnglish(r.prompt); return isVideo ? P.txt2vid(en, { model: "togetherai:wan-ai/wan2.7-t2v", ...(r.seconds ? { seconds: r.seconds } : {}), ...(r.size ? { size: r.size } : {}) }) : P.txt2img(en, { model: r.model || "black-forest-labs/flux-schnell" }); })();
   if (isVideo) w.textContent = "جارٍ توليد الفيديو… قد ياخذ من نصف دقيقة إلى بضع دقائق. ما تغلقش الصفحة.";
@@ -104,6 +116,38 @@ function puterMedia(j, r) {
     if (src.startsWith("https://") || (src.startsWith("data:image/") && src.length < 700000)) be.setResult?.(j.id, { kind: r.kind, url: src });
   }).catch(e => fail("فشل التوليد: " + (e?.error?.message || e?.message || e?.code || "سجّل الدخول في Puter وتأكد من رصيدك") + "."));
   return w;
+}
+
+// فيديو طويل: نقسّم القصة إلى مشاهد، نولّد مقطعاً لكل مشهد بالتتابع، ونعرضها كقائمة تشغيل متصلة
+async function longVideo(j, r, w, P, textOf, toEnglish, fail) {
+  const n = r.clips, urls = [];
+  const show = msg => { w.className = "muted"; w.textContent = msg; };
+  try {
+    show(`أكتب سيناريو من ${n} مشاهد…`);
+    let scenes = [];
+    try {
+      const idea = await toEnglish(r.prompt);
+      const raw = textOf(await P.chat([{ role: "system", content: `You write storyboards for kids' 3D animated videos. Return ONLY a JSON array of exactly ${n} short English scene descriptions (one sentence each) that continue one story in order. Describe the main character identically in every scene (same age, hair, outfit, colors) for visual consistency.` }, { role: "user", content: idea }]));
+      scenes = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
+    } catch {}
+    if (!Array.isArray(scenes) || !scenes.length) { const idea = await toEnglish(r.prompt); scenes = Array.from({ length: n }, (_, k) => `${idea} (scene ${k + 1} of ${n})`); }
+    scenes = scenes.slice(0, n);
+    for (let k = 0; k < scenes.length; k++) {
+      show(`جارٍ توليد المقطع ${k + 1} / ${scenes.length}… (${urls.length} جاهز). لا تغلق الصفحة.`);
+      try {
+        const v = await P.txt2vid(String(scenes[k]), { model: "togetherai:wan-ai/wan2.7-t2v", seconds: r.seconds, size: r.size });
+        urls.push(String(v.src || v));
+        w.className = ""; w.replaceChildren(playlist(urls.slice()), el("div", { className: "muted", textContent: `جارٍ توليد المقطع ${k + 2} / ${scenes.length}…` }));
+      } catch (e) {
+        const msg = e?.error?.message || e?.message || e?.code || "خطأ";
+        if (!urls.length) return fail("فشل التوليد: " + msg + ".");
+        w.className = ""; w.replaceChildren(playlist(urls), el("div", { className: "err", textContent: `توقف عند المقطع ${k + 1}: ${msg} (رصيد Puter المجاني على الأغلب). المقاطع السابقة جاهزة.` }));
+        be.setResult?.(j.id, { kind: "video", urls }); return;
+      }
+    }
+    w.className = ""; w.replaceChildren(playlist(urls));
+    be.setResult?.(j.id, { kind: "video", urls });
+  } catch (e) { fail("فشل التوليد: " + (e?.message || e) + "."); }
 }
 
 function renderJob(j) {
@@ -131,6 +175,7 @@ function renderJob(j) {
       attempt();
       card.append(note, img, el("a", { href: u, target: "_blank", rel: "noopener", textContent: "فتح / تحميل" }));
     }
+    else if (r.kind === "video" && r.urls) card.append(playlist(r.urls));
     else if (r.kind === "video" && u) card.append(el("video", { src: u, controls: true, loop: true, onerror: ev => ev.target.replaceWith(el("div", { className: "err", textContent: "انتهت صلاحية رابط الفيديو. حمّل الفيديو فور ما يخلص التوليد." })) }), el("a", { href: u, target: "_blank", rel: "noopener", textContent: "تحميل" }));
     else if (r.kind === "model3d" && u) {
       const mv = document.createElement("model-viewer");

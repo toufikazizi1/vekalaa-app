@@ -115,7 +115,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       let result;
       if (a.provider === "puter") {
         result = { kind: a.type, puter: true, prompt: (a.prefix || "") + prompt.slice(0, a.type === "text" ? 1500 : 450), system: a.system, model: a.model };
-        if (a.type === "video") { result.seconds = [5, 10, 15].includes(+opts.seconds) ? +opts.seconds : 5; result.size = opts.size === "1280x720" ? "1280x720" : "720x1280"; }
+        if (a.type === "video") { const tot = [5, 10, 15, 30, 60, 150].includes(+opts.seconds) ? +opts.seconds : 5; result.seconds = Math.min(tot, 10); result.clips = tot > 15 ? Math.ceil(tot / 10) : 1; if (tot <= 15) result.seconds = tot; result.size = opts.size === "1280x720" ? "1280x720" : "720x1280"; }
       } else if (a.provider === "pollinations") {
         const full = (a.prefix || "") + prompt.slice(0, 450); // روابط الصور لها حد طول
         result = { kind: "image", puter: true, prompt: full };
@@ -125,6 +125,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       const t = now();
       state.jobs.push({ id: String(t) + Math.random().toString(36).slice(2, 6), agent_id: a.id, agent_name: a.name, type: a.type, prompt,
         status: "done", result, created_ts: t, created_at: new Date(t).toISOString() });
+      if (result.clips > 1) state.points -= cost * (result.clips - 1);
       save();
       return {};
     },

@@ -68,8 +68,11 @@ async function start(agent: any, priv: any, prompt: string, opts: any = {}): Pro
   // مجاني: الصورة تُحمَّل من متصفح المستخدم نفسه (لا يمر عبر السيرفر ولا تكلفة عليك)
   if (agent.provider === "puter") {
     return { result: { kind: agent.type, puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, agent.type === "text" ? 1500 : 450), system: priv?.system || undefined, model: agent.id === "image_hd" ? "black-forest-labs/flux-2-pro" : undefined,
-      seconds: agent.type === "video" ? ([5, 10, 15].includes(+opts?.seconds) ? +opts.seconds : 5) : undefined,
-      size: agent.type === "video" ? (opts?.size === "1280x720" ? "1280x720" : "720x1280") : undefined } };
+      ...(agent.type === "video" ? (() => {
+        const tot = [5, 10, 15, 30, 60, 150].includes(+opts?.seconds) ? +opts.seconds : 5;
+        return { seconds: tot <= 15 ? tot : 10, clips: tot > 15 ? Math.ceil(tot / 10) : 1, size: opts?.size === "1280x720" ? "1280x720" : "720x1280" };
+      })() : {}),
+    } };
   }
   if (agent.provider === "pollinations") {
     return { result: { kind: "image", puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, 450) } };
