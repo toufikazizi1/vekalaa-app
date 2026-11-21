@@ -79,10 +79,20 @@ function puterMedia(j, r) {
   const w = imgCache[j.id] = el("div", { className: "muted", textContent: "جارٍ التوليد… (أول مرة قد تظهر نافذة لإنشاء حساب Puter مجاني، وافق عليها)" });
   const fail = msg => { w.className = "err"; w.replaceChildren(msg + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } })); };
   if (!window.puter) { fail("تعذر تحميل خدمة الصور."); return w; }
-  const isVideo = r.kind === "video";
-  const run = isVideo ? window.puter.ai.txt2vid(r.prompt, { model: "togetherai:wan-ai/wan2.7-t2v" }) : window.puter.ai.txt2img(r.prompt, { model: "black-forest-labs/flux-schnell" });
+  const isVideo = r.kind === "video", isText = r.kind === "text";
+  const P = window.puter.ai;
+  const run = isVideo ? P.txt2vid(r.prompt, { model: "togetherai:wan-ai/wan2.7-t2v" })
+    : isText ? P.chat(r.system ? [{ role: "system", content: r.system }, { role: "user", content: r.prompt }] : r.prompt)
+    : P.txt2img(r.prompt, { model: r.model || "black-forest-labs/flux-schnell" });
   if (isVideo) w.textContent = "جارٍ توليد الفيديو… قد ياخذ من نصف دقيقة إلى بضع دقائق. ما تغلقش الصفحة.";
   run.then(m => {
+    if (isText) {
+      const c = m?.message?.content ?? m?.text ?? m;
+      const text = typeof c === "string" ? c : Array.isArray(c) ? c.map(x => x.text || "").join("") : String(c);
+      w.className = ""; w.replaceChildren(el("pre", { textContent: text }));
+      be.setResult?.(j.id, { kind: "text", text });
+      return;
+    }
     m.alt = j.prompt; m.style.maxWidth = "100%"; m.style.borderRadius = "10px";
     if (isVideo) { m.controls = true; m.loop = true; }
     const src = String(m.src || m);

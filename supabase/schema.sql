@@ -169,11 +169,11 @@ insert into public.agents (id, name, icon, type, tier, provider, free_daily, pro
   ('art', 'لوحات فنية', '🎨', 'image', 'free', 'pollinations', 8, 80, 'رسم زيتي ولوحات فنية.', 11),
   ('product', 'تصميم منتجات', '📦', 'image', 'free', 'pollinations', 5, 50, 'عرض منتج أو علبة بشكل احترافي.', 12),
   ('cover', 'أغلفة يوتيوب', '📺', 'image', 'free', 'pollinations', 5, 50, 'أغلفة جذابة لفيديوهاتك وصفحاتك.', 13),
-  ('image_hd', 'صور HD', '🌟', 'image', 'premium', 'auto', 0, 50, 'جودة أعلى وسرعة أكبر.', 14),
+  ('image_hd', 'صور HD', '🌟', 'image', 'premium', 'puter', 0, 50, 'جودة أعلى وسرعة أكبر.', 14),
   ('video', 'صانع الفيديو', '🎬', 'video', 'premium', 'auto', 0, 10, 'فيديو قصير من وصف نصي.', 15),
   ('model3d', 'مجسمات 3D', '🧊', 'model3d', 'premium', 'auto', 0, 10, 'مجسم ثلاثي الأبعاد تدوّره وتعاينه.', 16),
-  ('ads', 'كاتب إعلانات', '📣', 'text', 'premium', 'auto', 0, 300, 'نصوص إعلانية بالعربية جاهزة للنشر.', 17),
-  ('chat', 'مساعد عام', '💬', 'text', 'premium', 'auto', 0, 300, 'اسأل أي سؤال.', 18)
+  ('ads', 'كاتب إعلانات', '📣', 'text', 'premium', 'puter', 0, 300, 'نصوص إعلانية بالعربية جاهزة للنشر.', 17),
+  ('chat', 'مساعد عام', '💬', 'text', 'premium', 'puter', 0, 300, 'اسأل أي سؤال.', 18)
 on conflict (id) do update set name=excluded.name, icon=excluded.icon, type=excluded.type, tier=excluded.tier,
   provider=excluded.provider, free_daily=excluded.free_daily, pro_daily=excluded.pro_daily,
   description=excluded.description, sort=excluded.sort;

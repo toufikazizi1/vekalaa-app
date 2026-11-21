@@ -67,7 +67,7 @@ async function start(agent: any, priv: any, prompt: string): Promise<{ result?: 
 
   // مجاني: الصورة تُحمَّل من متصفح المستخدم نفسه (لا يمر عبر السيرفر ولا تكلفة عليك)
   if (agent.provider === "puter") {
-    return { result: { kind: agent.type, puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, 450) } };
+    return { result: { kind: agent.type, puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, agent.type === "text" ? 1500 : 450), system: priv?.system || undefined, model: agent.id === "image_hd" ? "black-forest-labs/flux-2-pro" : undefined } };
   }
   if (agent.provider === "pollinations") {
     return { result: { kind: "image", puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, 450) } };

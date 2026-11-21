@@ -57,11 +57,11 @@ const DEMO_AGENTS = [
   { id: "art", name: "لوحات فنية", icon: "🎨", type: "image", tier: "free", provider: "pollinations", free_daily: 8, pro_daily: 80, description: "رسم زيتي ولوحات فنية.", prefix: "beautiful oil painting, artistic brush strokes, rich colors, gallery quality, " },
   { id: "product", name: "تصميم منتجات", icon: "📦", type: "image", tier: "free", provider: "pollinations", free_daily: 5, pro_daily: 50, description: "عرض منتج أو علبة بشكل احترافي.", prefix: "professional product photography, studio lighting, clean background, commercial advertising shot, " },
   { id: "cover", name: "أغلفة يوتيوب", icon: "📺", type: "image", tier: "free", provider: "pollinations", free_daily: 5, pro_daily: 50, description: "أغلفة جذابة لفيديوهاتك وصفحاتك.", prefix: "eye-catching social media thumbnail background, bold colors, dramatic lighting, high contrast, " },
-  { id: "image_hd", name: "صور HD", icon: "🌟", type: "image", tier: "premium", free_daily: 0, pro_daily: 50, description: "جودة أعلى وسرعة أكبر." },
+  { id: "image_hd", name: "صور HD", icon: "🌟", type: "image", tier: "premium", provider: "puter", model: "black-forest-labs/flux-2-pro", free_daily: 0, pro_daily: 50, description: "جودة أعلى وسرعة أكبر." },
   { id: "video", name: "صانع الفيديو", icon: "🎬", type: "video", tier: "premium", free_daily: 0, pro_daily: 10, description: "فيديو قصير من وصف نصي." },
   { id: "model3d", name: "مجسمات 3D", icon: "🧊", type: "model3d", tier: "premium", free_daily: 0, pro_daily: 10, description: "مجسم ثلاثي الأبعاد تدوّره وتعاينه." },
-  { id: "ads", name: "كاتب إعلانات", icon: "📣", type: "text", tier: "premium", free_daily: 0, pro_daily: 300, description: "نصوص إعلانية بالعربية جاهزة للنشر." },
-  { id: "chat", name: "مساعد عام", icon: "💬", type: "text", tier: "premium", free_daily: 0, pro_daily: 300, description: "اسأل أي سؤال." },
+  { id: "ads", name: "كاتب إعلانات", icon: "📣", type: "text", tier: "premium", provider: "puter", system: "أنت كاتب إعلانات محترف. اكتب بالعربية الفصحى المبسطة. أعط 3 صيغ قصيرة ومقنعة مع عنوان لكل واحدة. بدون مقدمات.", free_daily: 0, pro_daily: 300, description: "نصوص إعلانية بالعربية جاهزة للنشر." },
+  { id: "chat", name: "مساعد عام", icon: "💬", type: "text", tier: "premium", provider: "puter", system: "أنت مساعد مفيد. أجب بإيجاز وبنفس لغة المستخدم.", free_daily: 0, pro_daily: 300, description: "اسأل أي سؤال." },
 ];
 
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -94,7 +94,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
     },
     async signUp(email, password) { return this.signIn(email, password); },
     async signOut() { state.user = null; save(); listener(null); },
-    async agents() { return DEMO_AGENTS.map(({ prefix, provider, ...a }) => a); },
+    async agents() { return DEMO_AGENTS.map(({ prefix, provider, system, model, ...a }) => a); },
     async usage() {
       return DEMO_AGENTS.map(a => ({
         agent_id: a.id, used: usedToday(a.id), daily_limit: state.pro ? a.pro_daily : a.free_daily,
@@ -111,7 +111,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       if (usedToday(a.id) >= (state.pro ? a.pro_daily : a.free_daily)) fail("وصلت حدك اليومي لهذا الوكيل", "quota");
       let result;
       if (a.provider === "puter") {
-        result = { kind: a.type, puter: true, prompt: (a.prefix || "") + prompt.slice(0, 450) };
+        result = { kind: a.type, puter: true, prompt: (a.prefix || "") + prompt.slice(0, a.type === "text" ? 1500 : 450), system: a.system, model: a.model };
       } else if (a.provider === "pollinations") {
         const full = (a.prefix || "") + prompt.slice(0, 450); // روابط الصور لها حد طول
         result = { kind: "image", puter: true, prompt: full };
