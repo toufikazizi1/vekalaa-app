@@ -67,13 +67,7 @@ async function start(agent: any, priv: any, prompt: string): Promise<{ result?: 
 
   // مجاني: الصورة تُحمَّل من متصفح المستخدم نفسه (لا يمر عبر السيرفر ولا تكلفة عليك)
   if (agent.provider === "pollinations") {
-    const seed = Math.floor(Math.random() * 1e9);
-    return {
-      result: {
-        kind: "image",
-        url: `https://image.pollinations.ai/prompt/${encodeURIComponent((priv?.prefix || "") + prompt.slice(0, 450))}?width=768&height=768&seed=${seed}&nologo=true`,
-      },
-    };
+    return { result: { kind: "image", puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, 450) } };
   }
 
   if (agent.type === "image" || agent.type === "video") {

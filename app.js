@@ -71,6 +71,22 @@ function renderAgents() {
   }
 }
 
+
+const imgCache = {};
+// الصور المجانية عبر Puter.js: تُولَّد في متصفح المستخدم وتُحسب على حسابه المجاني عندهم (لا تكلفة عليك)
+function puterImage(j, r) {
+  if (imgCache[j.id]) return imgCache[j.id];
+  const w = imgCache[j.id] = el("div", { className: "muted", textContent: "جارٍ التوليد… (أول مرة قد تظهر نافذة لإنشاء حساب Puter مجاني، وافق عليها)" });
+  const fail = msg => { w.className = "err"; w.replaceChildren(msg + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } })); };
+  if (!window.puter) { fail("تعذر تحميل خدمة الصور."); return w; }
+  window.puter.ai.txt2img(r.prompt, { model: "black-forest-labs/flux-schnell" }).then(img => {
+    img.alt = j.prompt; img.style.maxWidth = "100%"; img.style.borderRadius = "10px";
+    w.className = ""; w.replaceChildren(img, el("a", { href: img.src, target: "_blank", rel: "noopener", download: "image.png", textContent: " فتح / تحميل" }));
+    if (img.src.startsWith("data:image/") && img.src.length < 700000) be.setResult?.(j.id, { kind: "image", url: img.src });
+  }).catch(e => fail("فشل التوليد: " + (e?.error?.message || e?.message || "سجّل الدخول في Puter وأعد المحاولة") + "."));
+  return w;
+}
+
 function renderJob(j) {
   const card = el("div", { className: "job", id: "job-" + j.id });
   const badge = { queued: "في الانتظار", running: "جارٍ التوليد…", done: "تم", failed: "فشل" }[j.status];
@@ -80,7 +96,8 @@ function renderJob(j) {
   if (j.status === "failed") card.append(el("div", { className: "err", textContent: (j.error || "") + " — لم تُحسب من حصتك اليومية" }));
   if (r) {
     const u = safeUrl(r.url);
-    if (r.kind === "image" && u) {
+    if (r.kind === "image" && r.puter) card.append(puterImage(j, r));
+    else if (r.kind === "image" && u) {
       // الخدمة المجانية (Pollinations) تسمح بصورة كل ~45 ثانية: نعيد المحاولة تلقائياً بدل إظهار خطأ
       const img = el("img", { alt: j.prompt });
       const note = el("div", { className: "muted" });

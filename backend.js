@@ -38,6 +38,7 @@ export function createSupabaseBackend(sb) {
     async deleteJob(id) { await sb.from("jobs").delete().eq("id", id); },
     generate(agentId, prompt) { return call({ action: "generate", agentId, prompt }); },
     sync() { return call({ action: "sync" }); },
+    async setResult() {},
   };
 }
 
@@ -110,7 +111,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       let result;
       if (a.provider === "pollinations") {
         const full = (a.prefix || "") + prompt.slice(0, 450); // روابط الصور لها حد طول
-        result = { kind: "image", url: `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=768&height=768&seed=${Math.floor(Math.random() * 1e9)}&nologo=true` };
+        result = { kind: "image", puter: true, prompt: full };
       } else if (a.type === "image") result = { kind: "image", url: mockImage(prompt), mock: true };
       else if (a.type === "text") result = { kind: "text", text: "وضع تجريبي: هنا يظهر رد الذكاء الاصطناعي الحقيقي بعد ربط Supabase وإضافة المفاتيح.\n\nطلبك: " + prompt, mock: true };
       else result = { kind: "text", text: "وضع تجريبي: التوليد الحقيقي لهذا الوكيل يتفعّل بعد ربط Supabase وإضافة المفتاح.", mock: true };
@@ -121,6 +122,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       return {};
     },
     async sync() {},
+    async setResult(id, result) { const j = state.jobs.find(x => x.id === id); if (j) { j.result = result; save(); } },
     setPro(v) { state.pro = !!v; save(); },
   };
 }
