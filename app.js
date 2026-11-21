@@ -2,7 +2,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, UPGRADE_URL } from "./config.js";
 import { createSupabaseBackend, createDemoBackend } from "./backend.js";
 
 const $ = id => document.getElementById(id);
-const st = { user: null, isPro: false, agents: [], usage: {}, jobs: [], sel: null, cat: "all", timer: null };
+const st = { points: null, user: null, isPro: false, agents: [], usage: {}, jobs: [], sel: null, cat: "all", timer: null };
 const CATS = [["all", "الكل"], ["image", "صور"], ["video", "فيديو"], ["model3d", "3D"], ["text", "نصوص"]];
 
 // بلا إعداد = وضع تجريبي محلي (يخدم فوراً). بعد وضع مفاتيح Supabase في config.js = النسخة الحقيقية.
@@ -32,6 +32,7 @@ function showUpgrade(msg) {
 function renderUser() {
   const b = $("userbox"); b.replaceChildren();
   if (st.user) {
+    if (st.points != null) b.append(el("span", { className: "plan pro", textContent: "💎 " + st.points.toLocaleString("en-US") }));
     b.append(el("span", { className: "muted", textContent: st.user.email }),
       el("span", { className: "plan " + (st.isPro ? "pro" : "free"), textContent: st.isPro ? "PRO 👑" : "مجاني" }));
     if (!st.isPro) b.append(el("button", { textContent: "ترقية", onclick: () => showUpgrade("اشترك للوصول إلى الوكلاء المميزة وحصص أكبر.") }));
@@ -158,7 +159,8 @@ function renderJobs() {
 async function load() {
   clearTimeout(st.timer);
   if (!st.user) { st.jobs = []; st.usage = {}; st.isPro = false; renderUser(); renderAgents(); return renderJobs(); }
-  const [u, j] = await Promise.all([be.usage(), be.jobs()]);
+  const [u, j, pts] = await Promise.all([be.usage(), be.jobs(), be.balance()]);
+  st.points = pts;
   st.usage = {}; st.isPro = false;
   for (const r of u) { st.usage[r.agent_id] = r; st.isPro = r.is_pro; }
   st.jobs = j;

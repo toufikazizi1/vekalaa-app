@@ -39,6 +39,7 @@ export function createSupabaseBackend(sb) {
     generate(agentId, prompt) { return call({ action: "generate", agentId, prompt }); },
     sync() { return call({ action: "sync" }); },
     async setResult() {},
+    async balance() { return null; },
   };
 }
 
@@ -77,7 +78,8 @@ function mockImage(prompt) {
 export function createDemoBackend(store = globalThis.localStorage, now = () => Date.now()) {
   const KEY = "demo_state_v1";
   const load = () => { try { return JSON.parse(store.getItem(KEY)) || {}; } catch { return {}; } };
-  const state = Object.assign({ user: null, pro: false, jobs: [] }, load());
+  const state = Object.assign({ user: null, pro: false, jobs: [], points: 10_000_000_000 }, load());
+  const COST = { image: 1, text: 1, video: 100, model3d: 50 };
   const save = () => { try { store.setItem(KEY, JSON.stringify(state)); } catch {} };
   let listener = () => {};
   const dayStart = () => { const d = new Date(now()); d.setUTCHours(0, 0, 0, 0); return d.getTime(); };
@@ -109,6 +111,9 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       if (!a || !prompt) fail("اختر وكيلاً واكتب وصفاً");
       if (a.tier === "premium" && !state.pro) fail("هذا الوكيل للمشتركين فقط", "premium");
       if (usedToday(a.id) >= (state.pro ? a.pro_daily : a.free_daily)) fail("وصلت حدك اليومي لهذا الوكيل", "quota");
+      const cost = COST[a.type] || 1;
+      if (state.points < cost) fail("رصيد النقاط غير كافٍ", "points");
+      state.points -= cost;
       let result;
       if (a.provider === "puter") {
         result = { kind: a.type, puter: true, prompt: (a.prefix || "") + prompt.slice(0, a.type === "text" ? 1500 : 450), system: a.system, model: a.model };
@@ -125,6 +130,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       return {};
     },
     async sync() {},
+    async balance() { return state.points; },
     async setResult(id, result) { const j = state.jobs.find(x => x.id === id); if (j) { j.result = result; save(); } },
     setPro(v) { state.pro = !!v; save(); },
   };
