@@ -71,7 +71,7 @@ async function start(agent: any, priv: any, prompt: string): Promise<{ result?: 
     return {
       result: {
         kind: "image",
-        url: `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=768&height=768&seed=${seed}&nologo=true`,
+        url: `https://image.pollinations.ai/prompt/${encodeURIComponent((priv?.prefix || "") + prompt.slice(0, 450))}?width=768&height=768&seed=${seed}&nologo=true`,
       },
     };
   }

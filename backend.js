@@ -109,7 +109,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       if (usedToday(a.id) >= (state.pro ? a.pro_daily : a.free_daily)) fail("وصلت حدك اليومي لهذا الوكيل", "quota");
       let result;
       if (a.provider === "pollinations") {
-        const full = (a.prefix || "") + prompt;
+        const full = (a.prefix || "") + prompt.slice(0, 450); // روابط الصور لها حد طول
         result = { kind: "image", url: `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=768&height=768&seed=${Math.floor(Math.random() * 1e9)}&nologo=true` };
       } else if (a.type === "image") result = { kind: "image", url: mockImage(prompt), mock: true };
       else if (a.type === "text") result = { kind: "text", text: "وضع تجريبي: هنا يظهر رد الذكاء الاصطناعي الحقيقي بعد ربط Supabase وإضافة المفاتيح.\n\nطلبك: " + prompt, mock: true };
