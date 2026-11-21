@@ -80,7 +80,21 @@ function renderJob(j) {
   if (j.status === "failed") card.append(el("div", { className: "err", textContent: (j.error || "") + " — لم تُحسب من حصتك اليومية" }));
   if (r) {
     const u = safeUrl(r.url);
-    if (r.kind === "image" && u) card.append(el("img", { src: u, alt: j.prompt, onerror: ev => ev.target.replaceWith(el("div", { className: "err", textContent: "تعذر تحميل الصورة (الخدمة المجانية قد تكون مشغولة). أعد المحاولة بعد قليل." })) }), el("a", { href: u, target: "_blank", rel: "noopener", textContent: "فتح / تحميل" }));
+    if (r.kind === "image" && u) {
+      // الخدمة المجانية (Pollinations) تسمح بصورة كل ~45 ثانية: نعيد المحاولة تلقائياً بدل إظهار خطأ
+      const img = el("img", { alt: j.prompt });
+      const note = el("div", { className: "muted" });
+      let tries = 0;
+      const attempt = () => { note.textContent = tries ? `الخدمة المجانية مشغولة (صورة كل 45 ثانية). إعادة المحاولة تلقائياً… (${tries}/6)` : "جارٍ التوليد…"; img.src = tries ? u + (u.includes("?") ? "&" : "?") + "r=" + tries : u; };
+      img.onload = () => note.remove();
+      img.onerror = () => {
+        if (u.startsWith("data:") || ++tries > 6) { note.className = "err"; note.textContent = "تعذر تحميل الصورة. أعد المحاولة لاحقاً."; img.remove(); return; }
+        note.textContent = `الخدمة المجانية مشغولة (صورة كل 45 ثانية). إعادة المحاولة بعد قليل… (${tries}/6)`;
+        setTimeout(attempt, 46000);
+      };
+      attempt();
+      card.append(note, img, el("a", { href: u, target: "_blank", rel: "noopener", textContent: "فتح / تحميل" }));
+    }
     else if (r.kind === "video" && u) card.append(el("video", { src: u, controls: true, loop: true }), el("a", { href: u, target: "_blank", rel: "noopener", textContent: "تحميل" }));
     else if (r.kind === "model3d" && u) {
       const mv = document.createElement("model-viewer");
