@@ -127,7 +127,7 @@ function renderJob(j) {
       attempt();
       card.append(note, img, el("a", { href: u, target: "_blank", rel: "noopener", textContent: "فتح / تحميل" }));
     }
-    else if (r.kind === "video" && u) card.append(el("video", { src: u, controls: true, loop: true }), el("a", { href: u, target: "_blank", rel: "noopener", textContent: "تحميل" }));
+    else if (r.kind === "video" && u) card.append(el("video", { src: u, controls: true, loop: true, onerror: ev => ev.target.replaceWith(el("div", { className: "err", textContent: "انتهت صلاحية رابط الفيديو. حمّل الفيديو فور ما يخلص التوليد." })) }), el("a", { href: u, target: "_blank", rel: "noopener", textContent: "تحميل" }));
     else if (r.kind === "model3d" && u) {
       const mv = document.createElement("model-viewer");
       mv.setAttribute("src", u); mv.setAttribute("camera-controls", ""); mv.setAttribute("auto-rotate", ""); mv.setAttribute("shadow-intensity", "1");
