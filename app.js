@@ -81,14 +81,19 @@ function puterMedia(j, r) {
   if (!window.puter) { fail("تعذر تحميل خدمة الصور."); return w; }
   const isVideo = r.kind === "video", isText = r.kind === "text";
   const P = window.puter.ai;
-  const run = isVideo ? P.txt2vid(r.prompt, { model: "togetherai:wan-ai/wan2.7-t2v" })
-    : isText ? P.chat(r.system ? [{ role: "system", content: r.system }, { role: "user", content: r.prompt }] : r.prompt)
-    : P.txt2img(r.prompt, { model: r.model || "black-forest-labs/flux-schnell" });
+  const textOf = m => { const c = m?.message?.content ?? m?.text ?? m; return typeof c === "string" ? c : Array.isArray(c) ? c.map(x => x.text || "").join("") : String(c); };
+  // الوصف بالعربية: نترجمه للإنجليزية أولاً لأن نماذج الصور والفيديو تفهم الإنجليزية أحسن
+  const toEnglish = async p => {
+    if (!/[\u0600-\u06FF]/.test(p)) return p;
+    try { return textOf(await P.chat([{ role: "system", content: "Translate the user's text to English. Output only the translation, nothing else." }, { role: "user", content: p }])).trim() || p; }
+    catch { return p; }
+  };
+  const run = isText ? P.chat(r.system ? [{ role: "system", content: r.system }, { role: "user", content: r.prompt }] : r.prompt)
+    : (async () => { const en = await toEnglish(r.prompt); return isVideo ? P.txt2vid(en, { model: "togetherai:wan-ai/wan2.7-t2v" }) : P.txt2img(en, { model: r.model || "black-forest-labs/flux-schnell" }); })();
   if (isVideo) w.textContent = "جارٍ توليد الفيديو… قد ياخذ من نصف دقيقة إلى بضع دقائق. ما تغلقش الصفحة.";
   run.then(m => {
     if (isText) {
-      const c = m?.message?.content ?? m?.text ?? m;
-      const text = typeof c === "string" ? c : Array.isArray(c) ? c.map(x => x.text || "").join("") : String(c);
+      const text = textOf(m);
       w.className = ""; w.replaceChildren(el("pre", { textContent: text }));
       be.setResult?.(j.id, { kind: "text", text });
       return;
