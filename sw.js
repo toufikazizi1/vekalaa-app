@@ -1,5 +1,5 @@
 // خدمة بسيطة: تحميل من الشبكة أولاً (دائماً أحدث نسخة)، وإن انقطع الإنترنت تُعرض النسخة المحفوظة
-const V = "v19";
+const V = "v20";
 const SHELL = ["./", "index.html", "app.js", "backend.js", "config.js", "style.css", "manifest.json", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

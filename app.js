@@ -284,6 +284,11 @@ function playlist(urls, auto = false) {
 }
 
 const pollUrl = (p, w = 768, h = 768) => `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=${w}&height=${h}&seed=${Math.floor(Math.random() * 1e9)}&nologo=true`;
+const errText = e => { try { return typeof e === "string" ? e : (e?.error?.message || e?.message || (typeof e?.error === "string" ? e.error : "") || e?.code || JSON.stringify(e) || ""); } catch { return String(e); } };
+const lowErr = e => isLowMsg(errText(e)) || isLowMsg(e?.code) || isLowMsg(e?.error?.code) || !(e && (e.message || e.error?.message));   // خطأ مجهول الشكل نعدّه نفاد رصيد (الأحوط)
+const wrapAI = ai => ({ chat: (...x) => ai.chat(...x).catch(e => { if (lowErr(e)) markLow(); throw e; }),
+  txt2img: (...x) => ai.txt2img(...x).catch(e => { if (lowErr(e)) markLow(); throw e; }),
+  txt2vid: (...x) => ai.txt2vid(...x).catch(e => { if (lowErr(e)) markLow(); throw e; }) });
 const isLowMsg = m => /credit|fund|balance|insufficient|billing/i.test(String(m || ""));
 const puterLow = () => { try { return Date.now() < +(localStorage.getItem("puter_low_until") || 0); } catch { return false; } };
 const markLow = () => { try { localStorage.setItem("puter_low_until", String(Date.now() + 6 * 3600e3)); } catch {} };
@@ -335,11 +340,11 @@ function puterMedia(j, r, force = false) {
   };
   if (!window.puter) { fail("تعذر تحميل خدمة الصور."); return w; }
   const isVideo = r.kind === "video", isText = r.kind === "text";
-  const P = window.puter.ai;
+  const P = wrapAI(window.puter.ai);
   const textOf = m => { const c = m?.message?.content ?? m?.text ?? m; return typeof c === "string" ? c : Array.isArray(c) ? c.map(x => x.text || "").join("") : String(c); };
   // الوصف بالعربية: نترجمه للإنجليزية أولاً لأن نماذج الصور والفيديو تفهم الإنجليزية أحسن
   const toEnglish = async p => {
-    if (!/[\u0600-\u06FF]/.test(p)) return p;
+    if (!/[\u0600-\u06FF]/.test(p) || puterLow()) return p;
     try { return textOf(await P.chat([{ role: "system", content: "Translate the user's text to English. Output only the translation, nothing else." }, { role: "user", content: p }])).trim() || p; }
     catch { return p; }
   };
