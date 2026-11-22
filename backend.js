@@ -45,7 +45,16 @@ export function createSupabaseBackend(sb) {
 
 // ---------- Demo (محلي) ----------
 const DEMO_AGENTS = [
-  { id: "story_video", name: "فيديو قصة 3D", icon: "📖", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "قصة مصوّرة متحركة بستايل 3D مع كلمات عربية، حتى دقيقتين ونصف — مجانية." },
+  { id: "story_video", name: "فيديو قصة 3D", icon: "📖", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "قصة مصوّرة متحركة بستايل أفلام الأطفال 3D مع كلمات عربية وموسيقى." },
+  { id: "story_anime", name: "فيديو أنمي", icon: "🎌", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "قصة بستايل الأنمي الياباني، حركة كاميرا وموسيقى." },
+  { id: "story_cartoon", name: "فيديو كرتون 2D", icon: "🎨", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "كرتون ملوّن بخطوط واضحة للأطفال." },
+  { id: "story_fairy", name: "حكايات خيالية", icon: "🧚", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "حكايات سحرية بألوان مائية دافئة." },
+  { id: "story_animals", name: "عالم الحيوانات", icon: "🦁", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "مغامرات حيوانات لطيفة بستايل 3D." },
+  { id: "story_moral", name: "قصص وعِبَر للأطفال", icon: "🌟", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "قصص تربوية قصيرة تعلّم قيمة جميلة." },
+  { id: "story_edu", name: "فيديو تعليمي للأطفال", icon: "🔤", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "حروف وأرقام وألوان بشكل ممتع." },
+  { id: "story_space", name: "فضاء وخيال علمي", icon: "🚀", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "رحلات فضائية وكواكب بستايل سينمائي." },
+  { id: "story_cinema", name: "فيديو سينمائي", icon: "🎥", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "مشاهد واقعية بإضاءة سينمائية." },
+  { id: "story_ad", name: "فيديو إعلان منتج", icon: "📣", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "فيديو إعلاني لمنتجك بلقطات احترافية." },
   { id: "image", name: "صانع الصور", icon: "🖼️", type: "image", tier: "free", provider: "pollinations", free_daily: 10, pro_daily: 100, description: "يحوّل وصفك إلى صورة." },
   { id: "logo", name: "مصمم الشعارات", icon: "✨", type: "image", tier: "free", provider: "pollinations", free_daily: 5, pro_daily: 50, description: "شعارات بسيطة وأنيقة لمشروعك.", prefix: "minimal modern vector logo, flat design, white background, " },
   { id: "video_free", name: "فيديو أطفال 3D", icon: "🎬", type: "video", tier: "free", provider: "puter", free_daily: 10, pro_daily: 10, description: "فيديو قصير بستايل كرتون 3D (يُحسب من رصيدك المجاني في Puter).", prefix: "cute 3D animated children's video, Pixar style, soft lighting, vibrant colors, smooth motion, " },
@@ -117,7 +126,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       let result;
       if (a.provider === "puter") {
         result = { kind: a.type, puter: true, prompt: (a.prefix || "") + prompt.slice(0, a.type === "text" ? 1500 : 450), system: a.system, model: a.model };
-        if (a.story) { result.story = true; result.prompt = prompt.slice(0, 450); result.total = [30, 60, 150].includes(+opts.seconds) ? +opts.seconds : 30; result.size = opts.size === "1280x720" ? "1280x720" : "720x1280"; }
+        if (a.story) { result.story = true; result.style = a.id; result.prompt = prompt.slice(0, 450); result.total = [30, 60, 150].includes(+opts.seconds) ? +opts.seconds : 30; result.size = opts.size === "1280x720" ? "1280x720" : "720x1280"; }
         else if (a.type === "video") { const tot = [5, 10, 15, 30, 60, 150].includes(+opts.seconds) ? +opts.seconds : 5; result.seconds = Math.min(tot, 10); result.clips = tot > 15 ? Math.ceil(tot / 10) : 1; if (tot <= 15) result.seconds = tot; result.size = opts.size === "1280x720" ? "1280x720" : "720x1280"; }
       } else if (a.provider === "pollinations") {
         const full = (a.prefix || "") + prompt.slice(0, 450); // روابط الصور لها حد طول

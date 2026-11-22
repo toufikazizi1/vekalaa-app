@@ -66,9 +66,9 @@ async function start(agent: any, priv: any, prompt: string, opts: any = {}): Pro
   const full = (priv?.prefix || "") + prompt;
 
   // مجاني: الصورة تُحمَّل من متصفح المستخدم نفسه (لا يمر عبر السيرفر ولا تكلفة عليك)
-  if (agent.provider === "puter" && agent.id === "story_video") {
+  if (agent.provider === "puter" && String(agent.id).startsWith("story_")) {
     const tot = [30, 60, 150].includes(+opts?.seconds) ? +opts.seconds : 30;
-    return { result: { kind: "video", puter: true, story: true, prompt: prompt.slice(0, 450), total: tot, size: opts?.size === "1280x720" ? "1280x720" : "720x1280" } };
+    return { result: { kind: "video", puter: true, story: true, style: agent.id, prompt: prompt.slice(0, 450), total: tot, size: opts?.size === "1280x720" ? "1280x720" : "720x1280" } };
   }
   if (agent.provider === "puter") {
     return { result: { kind: agent.type, puter: true, prompt: (priv?.prefix || "") + prompt.slice(0, agent.type === "text" ? 1500 : 450), system: priv?.system || undefined, model: agent.id === "image_hd" ? "black-forest-labs/flux-2-pro" : undefined,

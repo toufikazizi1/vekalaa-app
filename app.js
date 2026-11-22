@@ -73,7 +73,18 @@ function renderAgents() {
 
 // دمج المقاطع في فيديو واحد داخل المتصفح (ffmpeg.wasm). قد يفشل إن منع المتصفح تحميل المقاطع (CORS).
 // ===== فيديو قصة مصوّرة: صور 3D مجانية + حركة كاميرا + كلمات عربية، تُركَّب في فيديو واحد داخل المتصفح =====
-const STORY_STYLE = "cute 3D animated children's movie style, Pixar style, adorable characters with big expressive eyes, vibrant colors, soft cinematic lighting, highly detailed, ";
+const STORY_STYLES = {
+  story_video:   { art: "cute 3D animated children's movie style, Pixar style, adorable characters with big expressive eyes, vibrant colors, soft cinematic lighting, highly detailed, ", plan: "a cute kids' adventure story" },
+  story_anime:   { art: "anime style illustration, studio quality, vibrant colors, detailed background, cinematic composition, ", plan: "an emotional anime adventure story" },
+  story_cartoon: { art: "classic 2D cartoon style for kids, bold clean outlines, flat bright colors, cheerful, ", plan: "a funny cartoon story for kids" },
+  story_fairy:   { art: "magical fairy tale storybook illustration, soft watercolor, warm glowing light, whimsical, ", plan: "a magical fairy tale" },
+  story_animals: { art: "cute 3D animated animals, Pixar style, fluffy fur, expressive faces, lush nature, vibrant colors, ", plan: "an adventure of friendly animals" },
+  story_moral:   { art: "warm children's picture book illustration, gentle colors, friendly characters, ", plan: "a short story that teaches a good value such as honesty, sharing or kindness, ending with the lesson" },
+  story_edu:     { art: "colorful educational illustration for kids, simple big shapes, bright clean background, cheerful, ", plan: "a fun lesson that teaches children one simple concept (letters, numbers, colors or shapes) step by step" },
+  story_space:   { art: "cinematic sci-fi space scene, glowing planets and stars, dramatic lighting, highly detailed, ", plan: "an exciting space journey" },
+  story_cinema:  { art: "cinematic photorealistic film still, dramatic lighting, shallow depth of field, 35mm, highly detailed, ", plan: "a short cinematic story" },
+  story_ad:      { art: "professional commercial product photography, studio lighting, clean elegant background, premium advertising shot, ", plan: "a short product commercial: each scene shows a different benefit or angle of the product" },
+};
 const untainted = d => { try { const c = document.createElement("canvas"); c.width = c.height = 2; const x = c.getContext("2d"); x.drawImage(d, 0, 0, 2, 2); x.getImageData(0, 0, 1, 1); return true; } catch { return false; } };
 async function toDrawable(img) {
   try { await img.decode?.(); } catch {}
@@ -98,9 +109,23 @@ function wrapText(ctx, text, maxW) {
 async function renderStory(imgs, caps, W, H, per, onProgress) {
   const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const ctx = cv.getContext("2d");
-  const mime = ["video/mp4;codecs=avc1.42E01E", "video/mp4", "video/webm;codecs=vp9", "video/webm"].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
+  const mime = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
   if (!mime) throw new Error("المتصفح لا يدعم تسجيل الفيديو");
-  const rec = new MediaRecorder(cv.captureStream(30), { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+  const stream = cv.captureStream(30);
+  let actx = null;
+  try {   // موسيقى هادئة مولَّدة برمجياً (بلا حقوق) وتُسجَّل داخل الفيديو
+    actx = new (window.AudioContext || window.webkitAudioContext)(); await actx.resume();
+    const dest = actx.createMediaStreamDestination(); dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+    const notes = [261.63, 293.66, 329.63, 392, 440, 523.25, 392, 329.63], t0a = actx.currentTime + 0.1, secs = per * imgs.length;
+    for (let i = 0, tt = 0; tt < secs; i++, tt += 0.5) {
+      const o = actx.createOscillator(), g = actx.createGain(), f = notes[(i * 3 + (i >> 2)) % notes.length] * (i % 8 === 7 ? 2 : 1);
+      o.type = "triangle"; o.frequency.value = f; o.connect(g); g.connect(dest);
+      const t = t0a + tt; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+      o.start(t); o.stop(t + 1);
+      if (i % 4 === 0) { const b = actx.createOscillator(), bg = actx.createGain(); b.type = "sine"; b.frequency.value = notes[(i >> 2) % 3] / 2; b.connect(bg); bg.connect(dest); bg.gain.setValueAtTime(0.0001, t); bg.gain.exponentialRampToValueAtTime(0.06, t + 0.08); bg.gain.exponentialRampToValueAtTime(0.0001, t + 2); b.start(t); b.stop(t + 2.1); }
+    }
+  } catch { actx = null; }
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
   const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
   const stopped = new Promise(r => (rec.onstop = r));
   const dur = per * 1000, fade = 700, total = dur * imgs.length;
@@ -136,7 +161,7 @@ async function renderStory(imgs, caps, W, H, per, onProgress) {
     };
     frame();
   });
-  rec.stop(); await stopped; try { lock?.release(); } catch {}
+  rec.stop(); await stopped; try { lock?.release(); } catch {} try { actx?.close(); } catch {}
   const type = mime.split(";")[0];
   const blob = new Blob(chunks, { type });
   if (blob.size < 60000) throw new Error("الفيديو الناتج فارغ");
@@ -150,16 +175,30 @@ async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
     show(`أكتب القصة (${n} مشاهد)…`);
     let scenes = [];
     try {
-      const raw = textOf(await P.chat([{ role: "system", content: `You write storyboards for kids' short 3D animated story videos. Return ONLY a JSON array of exactly ${n} objects {"en":"one-sentence English image prompt for the scene; describe the main character (age, hair, outfit, colors) identically in every scene","ar":"one short Arabic narration sentence for this scene"}. The story has a beginning, a middle and a happy ending.` }, { role: "user", content: r.prompt }]));
+      const raw = textOf(await P.chat([{ role: "system", content: `You write storyboards for short videos. The video is ${(STORY_STYLES[r.style] || STORY_STYLES.story_video).plan}. Return ONLY a JSON array of exactly ${n} objects {"en":"one-sentence English image prompt for the scene; describe the main character or product identically in every scene","ar":"one short Arabic narration sentence for this scene"}. It has a beginning, a middle and a good ending.` }, { role: "user", content: r.prompt }]));
       scenes = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
     } catch {}
     if (!Array.isArray(scenes) || scenes.length < 2) { const idea = await toEnglish(r.prompt); scenes = Array.from({ length: n }, (_, k) => ({ en: `${idea}, scene ${k + 1}`, ar: "" })); }
     scenes = scenes.slice(0, n);
-    const imgs = [], caps = [], raws = []; let corsFail = false;
+    const imgs = [], caps = [], raws = []; let corsFail = false, usePoll = false;
+    const STYLE_ART = (STORY_STYLES[r.style] || STORY_STYLES.story_video).art;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const getImg = async prompt => {
+      if (!usePoll) {
+        try { return await P.txt2img(prompt, { model: "black-forest-labs/flux-schnell" }); }
+        catch (e) {
+          const m = e?.error?.message || e?.message || e?.code || "";
+          if (!/credit|fund|balance|insufficient|billing/i.test(String(m))) throw e;
+          usePoll = true; show("رصيد Puter خلص، أستعمل الخدمة البديلة (أبطأ: صورة كل 45 ثانية). لا تغلق الصفحة.");
+        }
+      }
+      await sleep(window.__POLL_PAUSE ?? 46000);
+      return await new Promise((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => rej(new Error("الخدمة البديلة مشغولة")); i.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${vertical ? 576 : 1024}&height=${vertical ? 1024 : 576}&seed=${Math.floor(Math.random() * 1e9)}&nologo=true`; });
+    };
     for (let k = 0; k < scenes.length; k++) {
       show(`أرسم المشهد ${k + 1} / ${scenes.length}… لا تغلق الصفحة ولا تطفئ الشاشة.`);
       try {
-        const img = await P.txt2img(STORY_STYLE + String(scenes[k].en || scenes[k]), { model: "black-forest-labs/flux-schnell" });
+        const img = await getImg(STYLE_ART + String(scenes[k].en || scenes[k]));
         raws.push(img);
         try { imgs.push(await toDrawable(img)); caps.push(String(scenes[k].ar || "")); } catch { corsFail = true; }
       } catch (e) {
