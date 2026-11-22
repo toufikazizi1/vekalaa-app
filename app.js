@@ -306,7 +306,7 @@ const wrapAI = ai => ({ chat: (...x) => ai.chat(...x).catch(e => { if (lowErr(e)
   txt2img: (...x) => ai.txt2img(...x).catch(e => { if (lowErr(e)) markLow(); throw e; }),
   txt2vid: (...x) => ai.txt2vid(...x).catch(e => { if (lowErr(e)) markLow(); throw e; }) });
 const isLowMsg = m => /credit|fund|balance|insufficient|billing/i.test(String(m || ""));
-const puterLow = () => { try { return Date.now() < +(localStorage.getItem("puter_low_until") || 0); } catch { return false; } };
+const puterLow = () => true;   // Puter معطّل نهائياً
 const markLow = () => { try { localStorage.setItem("puter_low_until", String(Date.now() + 6 * 3600e3)); } catch {} };
 const clearLow = () => { try { localStorage.removeItem("puter_low_until"); } catch {} };
 async function toEnglishFree(t) {   // ترجمة مجانية بدون Puter (قد تفشل فنُبقي النص)
@@ -423,9 +423,9 @@ function puterMedia(j, r, force = false) {
     } }));
     w.replaceChildren(...kids);
   };
-  if (!window.puter) { fail("تعذر تحميل خدمة الصور."); return w; }
+  if (!window.puter && !r.story) { fail("تعذر تحميل خدمة الصور."); return w; }
   const isVideo = r.kind === "video", isText = r.kind === "text";
-  const P = wrapAI(window.puter.ai);
+  const P = wrapAI(window.puter?.ai || {});
   const textOf = m => { const c = m?.message?.content ?? m?.text ?? m; return typeof c === "string" ? c : Array.isArray(c) ? c.map(x => x.text || "").join("") : String(c); };
   // الوصف بالعربية: نترجمه للإنجليزية أولاً لأن نماذج الصور والفيديو تفهم الإنجليزية أحسن
   const toEnglish = async p => {

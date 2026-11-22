@@ -69,9 +69,6 @@ const DEMO_AGENTS = [
   { id: "art", name: "لوحات فنية", icon: "🎨", type: "image", tier: "free", provider: "pollinations", free_daily: 8, pro_daily: 80, description: "رسم زيتي ولوحات فنية.", prefix: "beautiful oil painting, artistic brush strokes, rich colors, gallery quality, " },
   { id: "product", name: "تصميم منتجات", icon: "📦", type: "image", tier: "free", provider: "pollinations", free_daily: 5, pro_daily: 50, description: "عرض منتج أو علبة بشكل احترافي.", prefix: "professional product photography, studio lighting, clean background, commercial advertising shot, " },
   { id: "cover", name: "أغلفة يوتيوب", icon: "📺", type: "image", tier: "free", provider: "pollinations", free_daily: 5, pro_daily: 50, description: "أغلفة جذابة لفيديوهاتك وصفحاتك.", prefix: "eye-catching social media thumbnail background, bold colors, dramatic lighting, high contrast, " },
-  { id: "image_hd", name: "صور HD", icon: "🌟", type: "image", tier: "free", provider: "puter", model: "black-forest-labs/flux-2-pro", free_daily: 50, pro_daily: 50, description: "جودة أعلى وسرعة أكبر." },
-  { id: "ads", name: "كاتب إعلانات", icon: "📣", type: "text", tier: "free", provider: "puter", system: "أنت كاتب إعلانات محترف. اكتب بالعربية الفصحى المبسطة. أعط 3 صيغ قصيرة ومقنعة مع عنوان لكل واحدة. بدون مقدمات.", free_daily: 50, pro_daily: 50, description: "نصوص إعلانية بالعربية جاهزة للنشر." },
-  { id: "chat", name: "مساعد عام", icon: "💬", type: "text", tier: "free", provider: "puter", system: "أنت مساعد مفيد. أجب بإيجاز وبنفس لغة المستخدم.", free_daily: 50, pro_daily: 50, description: "اسأل أي سؤال." },
 ];
 
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
