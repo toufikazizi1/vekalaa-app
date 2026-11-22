@@ -71,14 +71,60 @@ function renderAgents() {
 }
 
 
-function playlist(urls) {
+// دمج المقاطع في فيديو واحد داخل المتصفح (ffmpeg.wasm). قد يفشل إن منع المتصفح تحميل المقاطع (CORS).
+let _ff;
+async function loadFFmpeg(status) {
+  if (_ff) return _ff;
+  const load = src => new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("load " + src)); document.head.append(s); });
+  status("تحميل أداة الدمج (مرة واحدة، حوالي 30MB)…");
+  await load("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js");
+  await load("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js");
+  const { FFmpeg } = window.FFmpegWASM, { toBlobURL } = window.FFmpegUtil;
+  const ff = new FFmpeg();
+  const core = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd";
+  await ff.load({
+    classWorkerURL: await toBlobURL("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js", "text/javascript"),
+    coreURL: await toBlobURL(`${core}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${core}/ffmpeg-core.wasm`, "application/wasm"),
+  });
+  return (_ff = ff);
+}
+async function mergeClips(urls, status) {
+  const ff = await loadFFmpeg(status), { fetchFile } = window.FFmpegUtil;
+  let list = "";
+  for (let i = 0; i < urls.length; i++) {
+    status(`تنزيل المقطع ${i + 1} / ${urls.length} للدمج…`);
+    await ff.writeFile(`c${i}.mp4`, await fetchFile(urls[i]));
+    list += `file 'c${i}.mp4'\n`;
+  }
+  await ff.writeFile("list.txt", list);
+  status("جارٍ دمج المقاطع في فيديو واحد…");
+  let code = await ff.exec(["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "out.mp4"]);
+  if (code !== 0) { status("إعادة الترميز (أبطأ)…"); code = await ff.exec(["-f", "concat", "-safe", "0", "-i", "list.txt", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "out.mp4"]); }
+  if (code !== 0) throw new Error("ffmpeg " + code);
+  const data = await ff.readFile("out.mp4");
+  return URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" }));
+}
+
+function playlist(urls, auto = false) {
   const box = el("div", {});
   const v = el("video", { src: urls[0], controls: true, playsInline: true, style: "max-width:100%;border-radius:10px" });
   let i = 0;
   const label = el("div", { className: "muted", textContent: `المقطع 1 / ${urls.length}` });
   v.onended = () => { if (i + 1 < urls.length) { i++; v.src = urls[i]; label.textContent = `المقطع ${i + 1} / ${urls.length}`; v.play().catch(() => {}); } };
   v.onerror = () => { label.className = "err"; label.textContent = "انتهت صلاحية روابط الفيديو. حمّل المقاطع فور ما تنتهي."; };
-  box.append(v, label, el("div", { className: "row" }, ...urls.map((u, k) => el("a", { href: u, target: "_blank", rel: "noopener", download: `clip_${k + 1}.mp4`, textContent: `تحميل ${k + 1}` }))));
+  const mergeBox = el("div", { className: "muted" });
+  const doMerge = async () => {
+    mergeBtn.disabled = true;
+    try {
+      const out = await mergeClips(urls, t => (mergeBox.textContent = t));
+      mergeBox.replaceChildren(el("b", { textContent: "الفيديو الكامل جاهز:" }), el("video", { src: out, controls: true, playsInline: true, style: "max-width:100%;border-radius:10px;display:block;margin:6px 0" }),
+        el("a", { href: out, download: "full_video.mp4", className: "btn primary", textContent: "تحميل الفيديو الكامل" }));
+    } catch (e) { mergeBox.className = "err"; mergeBox.textContent = "تعذّر الدمج التلقائي (قيود المتصفح على روابط المقاطع). حمّل المقاطع منفصلة من الأسفل. (" + (e?.message || e) + ")"; mergeBtn.disabled = false; }
+  };
+  const mergeBtn = el("button", { className: "primary", textContent: "🔗 دمج المقاطع في فيديو واحد", onclick: doMerge });
+  box.append(v, label, mergeBtn, mergeBox, el("div", { className: "row" }, ...urls.map((u, k) => el("a", { href: u, target: "_blank", rel: "noopener", download: `clip_${k + 1}.mp4`, textContent: `تحميل ${k + 1}` }))));
+  if (auto) setTimeout(doMerge, 0);
   return box;
 }
 
@@ -141,11 +187,11 @@ async function longVideo(j, r, w, P, textOf, toEnglish, fail) {
       } catch (e) {
         const msg = e?.error?.message || e?.message || e?.code || "خطأ";
         if (!urls.length) return fail("فشل التوليد: " + msg + ".");
-        w.className = ""; w.replaceChildren(playlist(urls), el("div", { className: "err", textContent: `توقف عند المقطع ${k + 1}: ${msg} (رصيد Puter المجاني على الأغلب). المقاطع السابقة جاهزة.` }));
+        w.className = ""; w.replaceChildren(playlist(urls, true), el("div", { className: "err", textContent: `توقف عند المقطع ${k + 1}: ${msg} (رصيد Puter المجاني على الأغلب). المقاطع السابقة جاهزة.` }));
         be.setResult?.(j.id, { kind: "video", urls }); return;
       }
     }
-    w.className = ""; w.replaceChildren(playlist(urls));
+    w.className = ""; w.replaceChildren(playlist(urls, true));
     be.setResult?.(j.id, { kind: "video", urls });
   } catch (e) { fail("فشل التوليد: " + (e?.message || e) + "."); }
 }

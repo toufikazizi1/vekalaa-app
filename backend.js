@@ -76,7 +76,8 @@ function mockImage(prompt) {
 export function createDemoBackend(store = globalThis.localStorage, now = () => Date.now()) {
   const KEY = "demo_state_v1";
   const load = () => { try { return JSON.parse(store.getItem(KEY)) || {}; } catch { return {}; } };
-  const state = Object.assign({ user: null, pro: false, jobs: [], points: 10_000_000_000 }, load());
+  const state = Object.assign({ user: null, pro: false, jobs: [], points: 20_000_000_000 }, load());
+  if (state.points < 20_000_000_000) state.points = 20_000_000_000;   // رصيد لا ينتهي: يُعاد ملؤه
   const COST = { image: 1, text: 1, video: 100, model3d: 50 };
   const save = () => { try { store.setItem(KEY, JSON.stringify(state)); } catch {} };
   let listener = () => {};
@@ -126,6 +127,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       state.jobs.push({ id: String(t) + Math.random().toString(36).slice(2, 6), agent_id: a.id, agent_name: a.name, type: a.type, prompt,
         status: "done", result, created_ts: t, created_at: new Date(t).toISOString() });
       if (result.clips > 1) state.points -= cost * (result.clips - 1);
+      if (state.points < 10_000_000_000) state.points = 20_000_000_000;
       save();
       return {};
     },
