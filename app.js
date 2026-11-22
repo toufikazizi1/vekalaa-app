@@ -186,7 +186,8 @@ async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
     }
     scenes = scenes.slice(0, n);
     const imgs = [], caps = [], raws = []; let corsFail = false, usePoll = false;
-    const STYLE_ART = (STORY_STYLES[r.style] || STORY_STYLES.story_video).art;
+    const STYLE_ART = "one single scene, main characters in the center, close-up medium shot, clear detailed faces with eyes nose and mouth, sharp focus, no text, no watermark, ";
+    const STYLE_ART2 = (STORY_STYLES[r.style] || STORY_STYLES.story_video).art;
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const getImg = async prompt => {
       if (puterLow()) usePoll = true;
@@ -199,14 +200,14 @@ async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
         }
       }
       await sleep(window.__POLL_PAUSE ?? 46000);
-      return await new Promise((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => rej(new Error("الخدمة البديلة مشغولة")); i.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${vertical ? 576 : 1024}&height=${vertical ? 1024 : 576}&seed=${Math.floor(Math.random() * 1e9)}&nologo=true`; });
+      return await new Promise((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => rej(new Error("الخدمة البديلة مشغولة")); i.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1e9)}&nologo=true`; });
     };
     for (let k = 0; k < scenes.length; k++) {
       show(`أرسم المشهد ${k + 1} / ${scenes.length}… لا تغلق الصفحة ولا تطفئ الشاشة.`);
       try {
-        const img = await getImg(STYLE_ART + String(scenes[k].en || scenes[k]));
+        const img = await getImg(STYLE_ART + STYLE_ART2 + String(scenes[k].en || scenes[k]));
         raws.push(img);
-        try { imgs.push(await toDrawable(img)); caps.push(String(scenes[k].ar || "")); } catch { corsFail = true; }
+        try { imgs.push(await toDrawable(img)); caps.push(""); } catch { corsFail = true; }
       } catch (e) {
         if (imgs.length < 2) return fail("فشل رسم المشاهد: " + (e?.error?.message || e?.message || e?.code || "خطأ") + ".");
         break;
