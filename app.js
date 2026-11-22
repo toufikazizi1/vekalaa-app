@@ -178,6 +178,7 @@ async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
     const vid = el("video", { src: out.url, controls: true, loop: true, playsInline: true, style: "max-width:100%;border-radius:10px;display:block" });
     w.className = ""; w.replaceChildren(vid, el("a", { href: out.url, download: `story_video.${out.ext}`, className: "btn primary", textContent: "⬇️ تحميل الفيديو الكامل" }),
       el("div", { className: "muted", textContent: "الفيديو مؤقت في المتصفح: حمّله الآن." }));
+    be.setResult?.(j.id, { kind: "text", text: "✔ تم تركيب الفيديو. الفيديو لا يُحفظ بعد إغلاق الصفحة، لذلك حمّله فور الانتهاء." });
   } catch (e) { fail("فشل التوليد: " + (e?.message || e) + "."); }
 }
 
@@ -239,8 +240,17 @@ function playlist(urls, auto = false) {
 
 const imgCache = {};
 // الصور المجانية عبر Puter.js: تُولَّد في متصفح المستخدم وتُحسب على حسابه المجاني عندهم (لا تكلفة عليك)
-function puterMedia(j, r) {
-  if (imgCache[j.id]) return imgCache[j.id];
+function puterMedia(j, r, force = false) {
+  if (!force && imgCache[j.id]) return imgCache[j.id];
+  // لا نولّد تلقائياً عند تحديث الصفحة أو لمهام قديمة (كان يستهلك الرصيد ويُظهر نافذة Puter كل مرة)
+  let started = []; try { started = JSON.parse(localStorage.getItem("puter_started") || "[]"); } catch {}
+  const age = Date.now() - (j.created_ts || Date.parse(j.created_at) || 0);
+  if (!force && (started.includes(j.id) || age > 180000)) {
+    const box = imgCache[j.id] = el("div", { className: "muted" }, "لم يُحفظ ناتج هذه المهمة. ",
+      el("button", { textContent: "▶ إعادة التوليد (يستهلك رصيد Puter)", onclick: () => { const nw = puterMedia(j, r, true); box.replaceWith(nw); } }));
+    return box;
+  }
+  if (!started.includes(j.id)) { started.push(j.id); try { localStorage.setItem("puter_started", JSON.stringify(started.slice(-300))); } catch {} }
   const w = imgCache[j.id] = el("div", { className: "muted", textContent: "جارٍ التوليد… (أول مرة قد تظهر نافذة لإنشاء حساب Puter مجاني، وافق عليها)" });
   const fail = msg => { w.className = "err"; w.replaceChildren(msg + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } })); };
   if (!window.puter) { fail("تعذر تحميل خدمة الصور."); return w; }
@@ -313,7 +323,8 @@ function renderJob(j) {
   card.append(el("p", { className: "p", textContent: j.prompt }));
   const r = j.result;
   if (j.status === "failed") card.append(el("div", { className: "err", textContent: (j.error || "") + " — لم تُحسب من حصتك اليومية" }));
-  if (r) {
+  if (r && imgCache[j.id]) card.append(imgCache[j.id]);   // أثناء الجلسة نُبقي العنصر المولَّد كما هو
+  else if (r) {
     const u = safeUrl(r.url);
     if (r.puter) card.append(puterMedia(j, r));
     else if (r.kind === "image" && u) {
