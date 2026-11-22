@@ -252,7 +252,18 @@ function puterMedia(j, r, force = false) {
   }
   if (!started.includes(j.id)) { started.push(j.id); try { localStorage.setItem("puter_started", JSON.stringify(started.slice(-300))); } catch {} }
   const w = imgCache[j.id] = el("div", { className: "muted", textContent: "جارٍ التوليد… (أول مرة قد تظهر نافذة لإنشاء حساب Puter مجاني، وافق عليها)" });
-  const fail = msg => { w.className = "err"; w.replaceChildren(msg + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } })); };
+  const fail = msg => {
+    const low = /credit|fund|balance|insufficient|billing/i.test(msg);
+    w.className = "err";
+    const kids = [low ? "رصيد Puter المجاني لحسابك خلص (حدّ من Puter وليس من التطبيق). " : msg + " ",
+      el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } })];
+    if (r.kind === "image") kids.push(el("button", { textContent: "🔁 خدمة بديلة مجانية (أبطأ وفيها علامة مائية)", onclick: () => {
+      delete imgCache[j.id];
+      be.setResult?.(j.id, { kind: "image", url: `https://image.pollinations.ai/prompt/${encodeURIComponent(r.prompt)}?width=768&height=768&seed=${Math.floor(Math.random() * 1e9)}&nologo=true` });
+      load();
+    } }));
+    w.replaceChildren(...kids);
+  };
   if (!window.puter) { fail("تعذر تحميل خدمة الصور."); return w; }
   const isVideo = r.kind === "video", isText = r.kind === "text";
   const P = window.puter.ai;
