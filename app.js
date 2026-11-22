@@ -174,22 +174,28 @@ async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
   try {
     show(`أكتب القصة (${n} مشاهد)…`);
     let scenes = [];
-    try {
+    if (!puterLow()) try {
       const raw = textOf(await P.chat([{ role: "system", content: `You write storyboards for short videos. The video is ${(STORY_STYLES[r.style] || STORY_STYLES.story_video).plan}. Return ONLY a JSON array of exactly ${n} objects {"en":"one-sentence English image prompt for the scene; describe the main character or product identically in every scene","ar":"one short Arabic narration sentence for this scene"}. It has a beginning, a middle and a good ending.` }, { role: "user", content: r.prompt }]));
       scenes = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
-    } catch {}
-    if (!Array.isArray(scenes) || scenes.length < 2) { const idea = await toEnglish(r.prompt); scenes = Array.from({ length: n }, (_, k) => ({ en: `${idea}, scene ${k + 1}`, ar: "" })); }
+    } catch (e) { if (isLowMsg(e?.error?.message || e?.message)) markLow(); }
+    if (!Array.isArray(scenes) || scenes.length < 2) {
+      const idea = puterLow() ? await toEnglishFree(r.prompt) : await toEnglish(r.prompt);
+      const tpl = ["the hero is introduced in a beautiful setting", "the hero starts an exciting journey", "the hero meets a new friend", "a challenge appears", "the hero solves it with courage", "a happy celebration ending"];
+      const arT = ["البداية", "الرحلة", "صديق جديد", "التحدي", "الحل", "النهاية السعيدة"];
+      scenes = Array.from({ length: n }, (_, k) => { const x = Math.floor((k * tpl.length) / n); return { en: `${idea}, ${tpl[x]}`, ar: k === 0 ? String(r.prompt).slice(0, 80) : arT[x] }; });
+    }
     scenes = scenes.slice(0, n);
     const imgs = [], caps = [], raws = []; let corsFail = false, usePoll = false;
     const STYLE_ART = (STORY_STYLES[r.style] || STORY_STYLES.story_video).art;
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const getImg = async prompt => {
+      if (puterLow()) usePoll = true;
       if (!usePoll) {
         try { return await P.txt2img(prompt, { model: "black-forest-labs/flux-schnell" }); }
         catch (e) {
           const m = e?.error?.message || e?.message || e?.code || "";
-          if (!/credit|fund|balance|insufficient|billing/i.test(String(m))) throw e;
-          usePoll = true; show("رصيد Puter خلص، أستعمل الخدمة البديلة (أبطأ: صورة كل 45 ثانية). لا تغلق الصفحة.");
+          if (!isLowMsg(m)) throw e;
+          markLow(); usePoll = true; show("رصيد Puter خلص، أستعمل الخدمة البديلة (أبطأ: صورة كل 45 ثانية). لا تغلق الصفحة.");
         }
       }
       await sleep(window.__POLL_PAUSE ?? 46000);
@@ -277,6 +283,16 @@ function playlist(urls, auto = false) {
   return box;
 }
 
+const pollUrl = (p, w = 768, h = 768) => `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=${w}&height=${h}&seed=${Math.floor(Math.random() * 1e9)}&nologo=true`;
+const isLowMsg = m => /credit|fund|balance|insufficient|billing/i.test(String(m || ""));
+const puterLow = () => { try { return Date.now() < +(localStorage.getItem("puter_low_until") || 0); } catch { return false; } };
+const markLow = () => { try { localStorage.setItem("puter_low_until", String(Date.now() + 6 * 3600e3)); } catch {} };
+const clearLow = () => { try { localStorage.removeItem("puter_low_until"); } catch {} };
+async function toEnglishFree(t) {   // ترجمة مجانية بدون Puter (قد تفشل فنُبقي النص)
+  if (!/[\u0600-\u06FF]/.test(t)) return t;
+  try { const j = await (await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=ar&tl=en&dt=t&q=" + encodeURIComponent(t))).json(); return j[0].map(x => x[0]).join("") || t; } catch { return t; }
+}
+
 const imgCache = {};
 // الصور المجانية عبر Puter.js: تُولَّد في متصفح المستخدم وتُحسب على حسابه المجاني عندهم (لا تكلفة عليك)
 function puterMedia(j, r, force = false) {
@@ -289,10 +305,24 @@ function puterMedia(j, r, force = false) {
       el("button", { textContent: "▶ إعادة التوليد (يستهلك رصيد Puter)", onclick: () => { const nw = puterMedia(j, r, true); box.replaceWith(nw); } }));
     return box;
   }
+  if (!force && puterLow() && !r.story) {
+    const box = imgCache[j.id] = el("div", { className: "muted" });
+    if (r.kind === "image") {
+      box.textContent = "رصيد Puter خلص، أستعمل الخدمة البديلة (أبطأ وفيها علامة مائية)… ";
+      let n = 0; const img = el("img", { alt: j.prompt, style: "max-width:100%;border-radius:10px;display:block" });
+      const go = () => { img.src = pollUrl(r.prompt) + (n ? "&r=" + n : ""); };
+      img.onload = () => { box.firstChild && box.firstChild.nodeType === 3 && (box.firstChild.textContent = ""); };
+      img.onerror = () => { if (++n <= 6) setTimeout(go, 46000); else box.append("تعذّر تحميل الصورة."); };
+      go(); box.append(img);
+    } else {
+      box.replaceChildren("رصيد Puter المجاني خلص لهذا النوع (حدّ من Puter). ", el("button", { textContent: "جرّب Puter مجدداً", onclick: () => { clearLow(); delete imgCache[j.id]; load(); } }));
+    }
+    return box;
+  }
   if (!started.includes(j.id)) { started.push(j.id); try { localStorage.setItem("puter_started", JSON.stringify(started.slice(-300))); } catch {} }
   const w = imgCache[j.id] = el("div", { className: "muted", textContent: "جارٍ التوليد… (أول مرة قد تظهر نافذة لإنشاء حساب Puter مجاني، وافق عليها)" });
   const fail = msg => {
-    const low = /credit|fund|balance|insufficient|billing/i.test(msg);
+    const low = isLowMsg(msg); if (low) markLow();
     w.className = "err";
     const kids = [low ? "رصيد Puter المجاني لحسابك خلص (حدّ من Puter وليس من التطبيق). " : msg + " ",
       el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } })];
