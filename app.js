@@ -128,14 +128,28 @@ async function renderStory(imgs, caps, W, H, per, onProgress) {
   const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
   const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
   const stopped = new Promise(r => (rec.onstop = r));
-  const dur = per * 1000, fade = 700, total = dur * imgs.length;
+  const dur = per * 1000, fade = 900, total = dur * imgs.length;
+  const ease = x => x * x * (3 - 2 * x);
   const drawImg = (img, k, p, alpha) => {
     const iw = img.width || img.naturalWidth, ih = img.height || img.naturalHeight;
-    const sc = Math.max(W / iw, H / ih) * (1.04 + 0.14 * (k % 2 ? 1 - p : p));
-    const dx = (k % 3 - 1) * 26 * (p - 0.5), dy = (k % 2 ? -1 : 1) * 20 * (p - 0.5);
+    const e = ease(Math.min(1, Math.max(0, p))), m = k % 6;   // 6 أنواع حركة كاميرا تتناوب
+    let z = 1.12, px = 0, py = 0;
+    if (m === 0) z = 1.06 + 0.2 * e;            // تقريب
+    else if (m === 1) z = 1.26 - 0.2 * e;       // ابتعاد
+    else if (m === 2) { z = 1.2; px = (0.5 - e) * 0.12; }   // تحريك يمين
+    else if (m === 3) { z = 1.2; px = (e - 0.5) * 0.12; }   // تحريك يسار
+    else if (m === 4) { z = 1.2; py = (e - 0.5) * 0.12; }   // رفع
+    else { z = 1.08 + 0.18 * e; py = (0.5 - e) * 0.06; px = (e - 0.5) * 0.05; }
+    const sc = Math.max(W / iw, H / ih) * z;
+    const sh = Math.sin(performance.now() / 700 + k) * 1.2;   // اهتزاز خفيف يعطي إحساس كاميرا حقيقية
     ctx.globalAlpha = alpha;
-    ctx.drawImage(img, (W - iw * sc) / 2 + dx, (H - ih * sc) / 2 + dy, iw * sc, ih * sc);
+    ctx.drawImage(img, (W - iw * sc) / 2 + px * W + sh, (H - ih * sc) / 2 + py * H + sh * 0.6, iw * sc, ih * sc);
     ctx.globalAlpha = 1;
+  };
+  const vignette = () => {
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.45)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   };
   const caption = txt => {
     if (!txt) return;
@@ -155,6 +169,7 @@ async function renderStory(imgs, caps, W, H, per, onProgress) {
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
       drawImg(imgs[i], i, local / dur, 1);
       if (local > dur - fade && imgs[i + 1]) drawImg(imgs[i + 1], i + 1, 0, (local - (dur - fade)) / fade);
+      vignette();
       caption(caps[i]);
       onProgress?.(Math.round((t / total) * 100));
       requestAnimationFrame(frame);
