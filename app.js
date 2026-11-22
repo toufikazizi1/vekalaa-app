@@ -362,16 +362,22 @@ function hfMedia(j, r, force = false) {
   started.push(j.id); try { localStorage.setItem("hf_started", JSON.stringify(started.slice(-300))); } catch {}
   const w = imgCache[j.id] = el("div", { className: "muted", textContent: "جارٍ التوليد…" });
   (async () => {
-    const en = await toEnglishFree(r.prompt);
-    return hfGenerate(en, r.seconds || 5, r.size, t => { w.textContent = t; });
-  })().then(url => {
-    const v = el("video", { src: url, controls: true, loop: true, playsInline: true, style: "max-width:100%;border-radius:10px;display:block" });
-    w.className = ""; w.replaceChildren(v, el("a", { href: url, target: "_blank", rel: "noopener", textContent: " فتح / تحميل" }));
-    be.setResult?.(j.id, { kind: "video", url });
-  }).catch(e => {
-    const m = String(e?.message || e), quota = /quota|gpu|exceed|queue|busy/i.test(m);
+    const en = await toEnglishFree(r.prompt), total = r.total || 5, n = Math.max(1, Math.ceil(total / 10)), urls = [];
+    for (let k = 0; k < n; k++) {
+      const sec = Math.min(10, total - k * 10);
+      const u = await hfGenerate(n > 1 ? `${en}, scene ${k + 1} of ${n}, continuing the same story and characters` : en, sec, r.size, t => { w.textContent = `المقطع ${k + 1} / ${n}: ${t}`; }).catch(err => { if (urls.length) return null; throw err; });
+      if (!u) break;
+      urls.push(u);
+    }
+    return urls;
+  })().then(urls => {
+    w.className = ""; w.replaceChildren(playlist(urls));
+    if (urls.length < Math.ceil((r.total || 5) / 10)) w.append(el("div", { className: "muted", textContent: `اكتمل ${urls.length} مقطع فقط، لأن الحصة المجانية اليومية من Hugging Face خلصت.` }));
+    be.setResult?.(j.id, { kind: "video", url: urls[0] });
+  }).catch(err => {
+    const m = String(err?.message || err), quota = /quota|gpu|exceed|queue|busy/i.test(m);
     w.className = "err";
-    w.replaceChildren(quota ? "حصتك المجانية اليوم من خدمة الفيديو خلصت أو الخدمة مزدحمة (حد من Hugging Face). جرّب بعد ساعات، أو استعمل «فيديو أنمي» (صور متحركة) الآن. " : "فشل التوليد: " + m + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } }));
+    w.replaceChildren(quota ? "حصتك المجانية اليوم من خدمة الفيديو خلصت أو الخدمة مزدحمة (حد من Hugging Face). جرّب بعد ساعات. " : "فشل التوليد: " + m + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } }));
   });
   return w;
 }
