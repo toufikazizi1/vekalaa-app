@@ -299,9 +299,72 @@ async function toEnglishFree(t) {   // ترجمة مجانية بدون Puter (�
   try { const j = await (await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=ar&tl=en&dt=t&q=" + encodeURIComponent(t))).json(); return j[0].map(x => x[0]).join("") || t; } catch { return t; }
 }
 
+
+// ===== فيديو حقيقي مجاني عبر Hugging Face Spaces (GPU عندهم، والحصة اليومية تُحسب على المستعمل نفسه) =====
+const HF_SPACES = ["https://lightricks-ltx-2-3.hf.space", "https://lightricks-ltx-video-distilled.hf.space"];
+const findUrl = x => { if (!x) return ""; if (typeof x === "string") return /^https?:.*\.(mp4|webm)(\?|$)/i.test(x) ? x : ""; if (typeof x === "object") { if (typeof x.url === "string" && /^https?:/.test(x.url) && !/\.(png|jpe?g|webp)(\?|$)/i.test(x.url)) return x.url; for (const k of Object.keys(x)) { const u = findUrl(x[k]); if (u) return u; } } return ""; };
+async function hfGenerate(prompt, seconds, size, onStatus) {
+  let last = "";
+  for (const base of HF_SPACES) {
+    try {
+      onStatus("أتصل بخدمة الفيديو…");
+      const info = await (await fetch(base + "/gradio_api/info")).json();
+      const eps = info.named_endpoints || {};
+      const name = Object.keys(eps).find(k => /generate|video/i.test(k)) || Object.keys(eps)[0];
+      if (!name) throw new Error("الخدمة غير متاحة");
+      const [W, H] = size === "1280x720" ? [768, 512] : [512, 768];
+      const data = eps[name].parameters.map(p => {
+        const lab = String(p.label || p.parameter_name || "").toLowerCase();
+        if (/negative/.test(lab)) return p.parameter_has_default ? p.parameter_default : "";
+        if (/prompt/.test(lab)) return prompt;
+        if (/duration/.test(lab)) return seconds;
+        if (/^width/.test(lab)) return W;
+        if (/^height/.test(lab)) return H;
+        return p.parameter_has_default ? p.parameter_default : null;
+      });
+      onStatus("أرسلت الوصف… قد يمر في الطابور من نصف دقيقة إلى بضع دقائق. لا تغلق الصفحة.");
+      const ev = await (await fetch(`${base}/gradio_api/call/${name.replace(/^\//, "")}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) })).json();
+      if (!ev.event_id) throw new Error("رفضت الخدمة الطلب");
+      const txt = await (await fetch(`${base}/gradio_api/call/${name.replace(/^\//, "")}/${ev.event_id}`)).text();
+      const blocks = txt.split(/\n\n+/);
+      const done = blocks.find(b => /^event: complete/m.test(b)), err = blocks.find(b => /^event: error/m.test(b));
+      if (!done) throw new Error(err ? (err.split("data:")[1] || "").trim() || "خطأ" : "لم يصل ناتج");
+      const url = findUrl(JSON.parse(done.split("data:").slice(1).join("data:")));
+      if (!url) throw new Error("لم أجد الفيديو في الناتج");
+      return url;
+    } catch (e) { last = String(e?.message || e); }
+  }
+  throw new Error(last || "تعذّر");
+}
+function hfMedia(j, r, force = false) {
+  if (!force && imgCache[j.id]) return imgCache[j.id];
+  let started = []; try { started = JSON.parse(localStorage.getItem("hf_started") || "[]"); } catch {}
+  const age = Date.now() - (j.created_ts || Date.parse(j.created_at) || 0);
+  if (!force && (started.includes(j.id) || age > 180000)) {
+    const box = imgCache[j.id] = el("div", { className: "muted" }, "لم يُحفظ ناتج هذه المهمة. ", el("button", { textContent: "▶ إعادة التوليد", onclick: () => { const nw = hfMedia(j, r, true); box.replaceWith(nw); } }));
+    return box;
+  }
+  started.push(j.id); try { localStorage.setItem("hf_started", JSON.stringify(started.slice(-300))); } catch {}
+  const w = imgCache[j.id] = el("div", { className: "muted", textContent: "جارٍ التوليد…" });
+  (async () => {
+    const en = await toEnglishFree(r.prompt);
+    return hfGenerate(en, r.seconds || 5, r.size, t => { w.textContent = t; });
+  })().then(url => {
+    const v = el("video", { src: url, controls: true, loop: true, playsInline: true, style: "max-width:100%;border-radius:10px;display:block" });
+    w.className = ""; w.replaceChildren(v, el("a", { href: url, target: "_blank", rel: "noopener", textContent: " فتح / تحميل" }));
+    be.setResult?.(j.id, { kind: "video", url });
+  }).catch(e => {
+    const m = String(e?.message || e), quota = /quota|gpu|exceed|queue|busy/i.test(m);
+    w.className = "err";
+    w.replaceChildren(quota ? "حصتك المجانية اليوم من خدمة الفيديو خلصت أو الخدمة مزدحمة (حد من Hugging Face). جرّب بعد ساعات، أو استعمل «فيديو أنمي» (صور متحركة) الآن. " : "فشل التوليد: " + m + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } }));
+  });
+  return w;
+}
+
 const imgCache = {};
 // الصور المجانية عبر Puter.js: تُولَّد في متصفح المستخدم وتُحسب على حسابه المجاني عندهم (لا تكلفة عليك)
 function puterMedia(j, r, force = false) {
+  if (r.hf) return hfMedia(j, r, force);
   if (!force && imgCache[j.id]) return imgCache[j.id];
   // لا نولّد تلقائياً عند تحديث الصفحة أو لمهام قديمة (كان يستهلك الرصيد ويُظهر نافذة Puter كل مرة)
   let started = []; try { started = JSON.parse(localStorage.getItem("puter_started") || "[]"); } catch {}
