@@ -74,11 +74,21 @@ function renderAgents() {
 // دمج المقاطع في فيديو واحد داخل المتصفح (ffmpeg.wasm). قد يفشل إن منع المتصفح تحميل المقاطع (CORS).
 // ===== فيديو قصة مصوّرة: صور 3D مجانية + حركة كاميرا + كلمات عربية، تُركَّب في فيديو واحد داخل المتصفح =====
 const STORY_STYLE = "cute 3D animated children's movie style, Pixar style, adorable characters with big expressive eyes, vibrant colors, soft cinematic lighting, highly detailed, ";
+const untainted = d => { try { const c = document.createElement("canvas"); c.width = c.height = 2; const x = c.getContext("2d"); x.drawImage(d, 0, 0, 2, 2); x.getImageData(0, 0, 1, 1); return true; } catch { return false; } };
 async function toDrawable(img) {
   try { await img.decode?.(); } catch {}
   const s = img.src || "";
-  if (s.startsWith("data:") || s.startsWith("blob:")) return img;
-  try { const blob = await (await fetch(s)).blob(); const bm = await createImageBitmap(blob); return bm; } catch { return img; }
+  if ((s.startsWith("data:") || s.startsWith("blob:")) && untainted(img)) return img;
+  const tries = [
+    async () => (await fetch(s)).blob(),                                   // مباشرة إن سمح الخادم (CORS)
+    async () => (await window.puter.net.fetch(s)).blob(),                   // عبر Puter (يتجاوز CORS)
+  ];
+  for (const t of tries) {
+    try { const bm = await createImageBitmap(await t()); if (untainted(bm)) return bm; } catch {}
+  }
+  const im = await new Promise((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = rej; i.src = s; }).catch(() => null);
+  if (im && untainted(im)) return im;
+  throw new Error("cors");
 }
 function wrapText(ctx, text, maxW) {
   const words = text.split(/\s+/), lines = []; let cur = "";
@@ -109,11 +119,12 @@ async function renderStory(imgs, caps, W, H, per, onProgress) {
     ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(W * 0.05, y0, W * 0.9, bh);
     ctx.fillStyle = "#fff"; lines.forEach((l, i) => ctx.fillText(l, W / 2, y0 + fs * 0.95 + i * lh));
   };
+  let lock = null; try { lock = await navigator.wakeLock?.request("screen"); } catch {}
   rec.start();
-  const t0 = performance.now();
+  let t = 0, last = performance.now();
   await new Promise(done => {
     const frame = () => {
-      const t = performance.now() - t0;
+      const now = performance.now(); t += Math.min(now - last, 100); last = now;   // لا نحسب وقت غياب الصفحة عن الشاشة
       if (t >= total) return done();
       const i = Math.min(imgs.length - 1, Math.floor(t / dur)), local = t - i * dur;
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
@@ -125,9 +136,11 @@ async function renderStory(imgs, caps, W, H, per, onProgress) {
     };
     frame();
   });
-  rec.stop(); await stopped;
+  rec.stop(); await stopped; try { lock?.release(); } catch {}
   const type = mime.split(";")[0];
-  return { url: URL.createObjectURL(new Blob(chunks, { type })), ext: type === "video/mp4" ? "mp4" : "webm" };
+  const blob = new Blob(chunks, { type });
+  if (blob.size < 60000) throw new Error("الفيديو الناتج فارغ");
+  return { url: URL.createObjectURL(blob), ext: type === "video/mp4" ? "mp4" : "webm" };
 }
 async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
   const n = Math.max(3, Math.min(25, Math.round((r.total || 30) / 6))), per = Math.round((r.total || 30) / n);
@@ -142,16 +155,23 @@ async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
     } catch {}
     if (!Array.isArray(scenes) || scenes.length < 2) { const idea = await toEnglish(r.prompt); scenes = Array.from({ length: n }, (_, k) => ({ en: `${idea}, scene ${k + 1}`, ar: "" })); }
     scenes = scenes.slice(0, n);
-    const imgs = [], caps = [];
+    const imgs = [], caps = [], raws = []; let corsFail = false;
     for (let k = 0; k < scenes.length; k++) {
       show(`أرسم المشهد ${k + 1} / ${scenes.length}… لا تغلق الصفحة ولا تطفئ الشاشة.`);
       try {
         const img = await P.txt2img(STORY_STYLE + String(scenes[k].en || scenes[k]), { model: "black-forest-labs/flux-schnell" });
-        imgs.push(await toDrawable(img)); caps.push(String(scenes[k].ar || ""));
+        raws.push(img);
+        try { imgs.push(await toDrawable(img)); caps.push(String(scenes[k].ar || "")); } catch { corsFail = true; }
       } catch (e) {
         if (imgs.length < 2) return fail("فشل رسم المشاهد: " + (e?.error?.message || e?.message || e?.code || "خطأ") + ".");
         break;
       }
+    }
+    if (imgs.length < 2) {
+      w.className = "";
+      w.replaceChildren(el("div", { className: "err", textContent: "تعذّر تركيب الفيديو تلقائياً: المتصفح يمنع قراءة الصور المولّدة. الصور جاهزة للتحميل أدناه." }),
+        ...raws.map((im, k) => el("div", {}, Object.assign(im, { style: "max-width:100%;border-radius:10px" }), el("a", { href: im.src, target: "_blank", rel: "noopener", download: `scene_${k + 1}.png`, textContent: ` تحميل المشهد ${k + 1}` }))));
+      return;
     }
     show(`جارٍ تركيب الفيديو (${imgs.length * per} ثانية)… 0%. لا تغلق الصفحة ولا تطفئ الشاشة.`);
     const out = await renderStory(imgs, caps, W, H, per, p => (w.textContent = `جارٍ تركيب الفيديو… ${p}%. لا تغلق الصفحة ولا تطفئ الشاشة.`));
