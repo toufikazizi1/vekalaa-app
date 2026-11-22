@@ -45,6 +45,7 @@ export function createSupabaseBackend(sb) {
 
 // ---------- Demo (محلي) ----------
 const DEMO_AGENTS = [
+  { id: "story_video", name: "فيديو قصة 3D", icon: "📖", type: "video", tier: "free", provider: "puter", story: true, free_daily: 20, pro_daily: 20, description: "قصة مصوّرة متحركة بستايل 3D مع كلمات عربية، حتى دقيقتين ونصف — مجانية." },
   { id: "image", name: "صانع الصور", icon: "🖼️", type: "image", tier: "free", provider: "pollinations", free_daily: 10, pro_daily: 100, description: "يحوّل وصفك إلى صورة." },
   { id: "logo", name: "مصمم الشعارات", icon: "✨", type: "image", tier: "free", provider: "pollinations", free_daily: 5, pro_daily: 50, description: "شعارات بسيطة وأنيقة لمشروعك.", prefix: "minimal modern vector logo, flat design, white background, " },
   { id: "video_free", name: "فيديو أطفال 3D", icon: "🎬", type: "video", tier: "free", provider: "puter", free_daily: 10, pro_daily: 10, description: "فيديو قصير بستايل كرتون 3D (يُحسب من رصيدك المجاني في Puter).", prefix: "cute 3D animated children's video, Pixar style, soft lighting, vibrant colors, smooth motion, " },
@@ -95,7 +96,7 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
     },
     async signUp(email, password) { return this.signIn(email, password); },
     async signOut() { state.user = null; save(); listener(null); },
-    async agents() { return DEMO_AGENTS.map(({ prefix, provider, system, model, ...a }) => a); },
+    async agents() { return DEMO_AGENTS.map(({ prefix, provider, system, model, story, ...a }) => a); },
     async usage() {
       return DEMO_AGENTS.map(a => ({
         agent_id: a.id, used: usedToday(a.id), daily_limit: state.pro ? a.pro_daily : a.free_daily,
@@ -116,7 +117,8 @@ export function createDemoBackend(store = globalThis.localStorage, now = () => D
       let result;
       if (a.provider === "puter") {
         result = { kind: a.type, puter: true, prompt: (a.prefix || "") + prompt.slice(0, a.type === "text" ? 1500 : 450), system: a.system, model: a.model };
-        if (a.type === "video") { const tot = [5, 10, 15, 30, 60, 150].includes(+opts.seconds) ? +opts.seconds : 5; result.seconds = Math.min(tot, 10); result.clips = tot > 15 ? Math.ceil(tot / 10) : 1; if (tot <= 15) result.seconds = tot; result.size = opts.size === "1280x720" ? "1280x720" : "720x1280"; }
+        if (a.story) { result.story = true; result.prompt = prompt.slice(0, 450); result.total = [30, 60, 150].includes(+opts.seconds) ? +opts.seconds : 30; result.size = opts.size === "1280x720" ? "1280x720" : "720x1280"; }
+        else if (a.type === "video") { const tot = [5, 10, 15, 30, 60, 150].includes(+opts.seconds) ? +opts.seconds : 5; result.seconds = Math.min(tot, 10); result.clips = tot > 15 ? Math.ceil(tot / 10) : 1; if (tot <= 15) result.seconds = tot; result.size = opts.size === "1280x720" ? "1280x720" : "720x1280"; }
       } else if (a.provider === "pollinations") {
         const full = (a.prefix || "") + prompt.slice(0, 450); // روابط الصور لها حد طول
         result = { kind: "image", puter: true, prompt: full };

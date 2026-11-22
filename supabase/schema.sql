@@ -158,6 +158,7 @@ on conflict (id) do nothing;
 insert into public.agents (id, name, icon, type, tier, provider, free_daily, pro_daily, description, sort) values
   ('image',    'صانع الصور',      '🖼️', 'image',   'free',    'pollinations', 10, 100, 'يحوّل وصفك إلى صورة.', 1),
   ('logo',     'مصمم الشعارات',   '✨', 'image',   'free',    'pollinations', 5,  50,  'شعارات بسيطة وأنيقة لمشروعك.', 2),
+  ('story_video', 'فيديو قصة 3D', '📖', 'video', 'free', 'puter', 20, 20, 'قصة مصوّرة متحركة بستايل 3D مع كلمات عربية، حتى دقيقتين ونصف — مجانية.', 0),
   ('video_free', 'فيديو أطفال 3D', '🎬', 'video', 'free', 'puter', 10, 10, 'فيديو قصير بستايل كرتون 3D (يُحسب من رصيدك المجاني في Puter).', 3),
   ('cartoon3d', 'كرتون 3D', '🧸', 'image', 'free', 'pollinations', 8, 80, 'شخصيات كرتونية ثلاثية الأبعاد بستايل أفلام الأطفال.', 4),
   ('anime', 'أنمي', '🎌', 'image', 'free', 'pollinations', 8, 80, 'رسومات بستايل الأنمي الياباني.', 5),

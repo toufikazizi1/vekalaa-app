@@ -72,6 +72,95 @@ function renderAgents() {
 
 
 // دمج المقاطع في فيديو واحد داخل المتصفح (ffmpeg.wasm). قد يفشل إن منع المتصفح تحميل المقاطع (CORS).
+// ===== فيديو قصة مصوّرة: صور 3D مجانية + حركة كاميرا + كلمات عربية، تُركَّب في فيديو واحد داخل المتصفح =====
+const STORY_STYLE = "cute 3D animated children's movie style, Pixar style, adorable characters with big expressive eyes, vibrant colors, soft cinematic lighting, highly detailed, ";
+async function toDrawable(img) {
+  try { await img.decode?.(); } catch {}
+  const s = img.src || "";
+  if (s.startsWith("data:") || s.startsWith("blob:")) return img;
+  try { const blob = await (await fetch(s)).blob(); const bm = await createImageBitmap(blob); return bm; } catch { return img; }
+}
+function wrapText(ctx, text, maxW) {
+  const words = text.split(/\s+/), lines = []; let cur = "";
+  for (const w of words) { const t = cur ? cur + " " + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
+  if (cur) lines.push(cur); return lines;
+}
+async function renderStory(imgs, caps, W, H, per, onProgress) {
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  const mime = ["video/mp4;codecs=avc1.42E01E", "video/mp4", "video/webm;codecs=vp9", "video/webm"].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
+  if (!mime) throw new Error("المتصفح لا يدعم تسجيل الفيديو");
+  const rec = new MediaRecorder(cv.captureStream(30), { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+  const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const stopped = new Promise(r => (rec.onstop = r));
+  const dur = per * 1000, fade = 700, total = dur * imgs.length;
+  const drawImg = (img, k, p, alpha) => {
+    const iw = img.width || img.naturalWidth, ih = img.height || img.naturalHeight;
+    const sc = Math.max(W / iw, H / ih) * (1.04 + 0.14 * (k % 2 ? 1 - p : p));
+    const dx = (k % 3 - 1) * 26 * (p - 0.5), dy = (k % 2 ? -1 : 1) * 20 * (p - 0.5);
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(img, (W - iw * sc) / 2 + dx, (H - ih * sc) / 2 + dy, iw * sc, ih * sc);
+    ctx.globalAlpha = 1;
+  };
+  const caption = txt => {
+    if (!txt) return;
+    const fs = Math.round(W * 0.058); ctx.font = `bold ${fs}px sans-serif`; ctx.direction = "rtl"; ctx.textAlign = "center";
+    const lines = wrapText(ctx, txt, W * 0.84), lh = fs * 1.35, bh = lines.length * lh + fs, y0 = H - bh - H * 0.06;
+    ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(W * 0.05, y0, W * 0.9, bh);
+    ctx.fillStyle = "#fff"; lines.forEach((l, i) => ctx.fillText(l, W / 2, y0 + fs * 0.95 + i * lh));
+  };
+  rec.start();
+  const t0 = performance.now();
+  await new Promise(done => {
+    const frame = () => {
+      const t = performance.now() - t0;
+      if (t >= total) return done();
+      const i = Math.min(imgs.length - 1, Math.floor(t / dur)), local = t - i * dur;
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+      drawImg(imgs[i], i, local / dur, 1);
+      if (local > dur - fade && imgs[i + 1]) drawImg(imgs[i + 1], i + 1, 0, (local - (dur - fade)) / fade);
+      caption(caps[i]);
+      onProgress?.(Math.round((t / total) * 100));
+      requestAnimationFrame(frame);
+    };
+    frame();
+  });
+  rec.stop(); await stopped;
+  const type = mime.split(";")[0];
+  return { url: URL.createObjectURL(new Blob(chunks, { type })), ext: type === "video/mp4" ? "mp4" : "webm" };
+}
+async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
+  const n = Math.max(3, Math.min(25, Math.round((r.total || 30) / 6))), per = Math.round((r.total || 30) / n);
+  const show = m => { w.className = "muted"; w.textContent = m; };
+  const vertical = r.size !== "1280x720", W = vertical ? 720 : 1280, H = vertical ? 1280 : 720;
+  try {
+    show(`أكتب القصة (${n} مشاهد)…`);
+    let scenes = [];
+    try {
+      const raw = textOf(await P.chat([{ role: "system", content: `You write storyboards for kids' short 3D animated story videos. Return ONLY a JSON array of exactly ${n} objects {"en":"one-sentence English image prompt for the scene; describe the main character (age, hair, outfit, colors) identically in every scene","ar":"one short Arabic narration sentence for this scene"}. The story has a beginning, a middle and a happy ending.` }, { role: "user", content: r.prompt }]));
+      scenes = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
+    } catch {}
+    if (!Array.isArray(scenes) || scenes.length < 2) { const idea = await toEnglish(r.prompt); scenes = Array.from({ length: n }, (_, k) => ({ en: `${idea}, scene ${k + 1}`, ar: "" })); }
+    scenes = scenes.slice(0, n);
+    const imgs = [], caps = [];
+    for (let k = 0; k < scenes.length; k++) {
+      show(`أرسم المشهد ${k + 1} / ${scenes.length}… لا تغلق الصفحة ولا تطفئ الشاشة.`);
+      try {
+        const img = await P.txt2img(STORY_STYLE + String(scenes[k].en || scenes[k]), { model: "black-forest-labs/flux-schnell" });
+        imgs.push(await toDrawable(img)); caps.push(String(scenes[k].ar || ""));
+      } catch (e) {
+        if (imgs.length < 2) return fail("فشل رسم المشاهد: " + (e?.error?.message || e?.message || e?.code || "خطأ") + ".");
+        break;
+      }
+    }
+    show(`جارٍ تركيب الفيديو (${imgs.length * per} ثانية)… 0%. لا تغلق الصفحة ولا تطفئ الشاشة.`);
+    const out = await renderStory(imgs, caps, W, H, per, p => (w.textContent = `جارٍ تركيب الفيديو… ${p}%. لا تغلق الصفحة ولا تطفئ الشاشة.`));
+    const vid = el("video", { src: out.url, controls: true, loop: true, playsInline: true, style: "max-width:100%;border-radius:10px;display:block" });
+    w.className = ""; w.replaceChildren(vid, el("a", { href: out.url, download: `story_video.${out.ext}`, className: "btn primary", textContent: "⬇️ تحميل الفيديو الكامل" }),
+      el("div", { className: "muted", textContent: "الفيديو مؤقت في المتصفح: حمّله الآن." }));
+  } catch (e) { fail("فشل التوليد: " + (e?.message || e) + "."); }
+}
+
 let _ff;
 async function loadFFmpeg(status) {
   if (_ff) return _ff;
@@ -144,6 +233,7 @@ function puterMedia(j, r) {
     try { return textOf(await P.chat([{ role: "system", content: "Translate the user's text to English. Output only the translation, nothing else." }, { role: "user", content: p }])).trim() || p; }
     catch { return p; }
   };
+  if (r.story) { storyVideo(j, r, w, P, textOf, toEnglish, fail); return w; }
   if (isVideo && r.clips > 1) { longVideo(j, r, w, P, textOf, toEnglish, fail); return w; }
   const run = isText ? P.chat(r.system ? [{ role: "system", content: r.system }, { role: "user", content: r.prompt }] : r.prompt)
     : (async () => { const en = await toEnglish(r.prompt); return isVideo ? P.txt2vid(en, { model: "togetherai:wan-ai/wan2.7-t2v", ...(r.seconds ? { seconds: r.seconds } : {}), ...(r.size ? { size: r.size } : {}) }) : P.txt2img(en, { model: r.model || "black-forest-labs/flux-schnell" }); })();
