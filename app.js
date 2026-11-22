@@ -174,12 +174,12 @@ async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
   try {
     show(`أكتب القصة (${n} مشاهد)…`);
     let scenes = [];
-    if (!puterLow()) try {
+    if (false) try {
       const raw = textOf(await P.chat([{ role: "system", content: `You write storyboards for short videos. The video is ${(STORY_STYLES[r.style] || STORY_STYLES.story_video).plan}. Return ONLY a JSON array of exactly ${n} objects {"en":"one-sentence English image prompt for the scene; describe the main character or product identically in every scene","ar":"one short Arabic narration sentence for this scene"}. It has a beginning, a middle and a good ending.` }, { role: "user", content: r.prompt }]));
       scenes = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
     } catch (e) { if (isLowMsg(e?.error?.message || e?.message)) markLow(); }
     if (!Array.isArray(scenes) || scenes.length < 2) {
-      const idea = puterLow() ? await toEnglishFree(r.prompt) : await toEnglish(r.prompt);
+      const idea = await toEnglishFree(r.prompt);
       const tpl = ["the hero is introduced in a beautiful setting", "the hero starts an exciting journey", "the hero meets a new friend", "a challenge appears", "the hero solves it with courage", "a happy celebration ending"];
       const arT = ["البداية", "الرحلة", "صديق جديد", "التحدي", "الحل", "النهاية السعيدة"];
       scenes = Array.from({ length: n }, (_, k) => { const x = Math.floor((k * tpl.length) / n); return { en: `${idea}, ${tpl[x]}`, ar: k === 0 ? String(r.prompt).slice(0, 80) : arT[x] }; });
@@ -344,7 +344,7 @@ function puterMedia(j, r, force = false) {
   const textOf = m => { const c = m?.message?.content ?? m?.text ?? m; return typeof c === "string" ? c : Array.isArray(c) ? c.map(x => x.text || "").join("") : String(c); };
   // الوصف بالعربية: نترجمه للإنجليزية أولاً لأن نماذج الصور والفيديو تفهم الإنجليزية أحسن
   const toEnglish = async p => {
-    if (!/[\u0600-\u06FF]/.test(p) || puterLow()) return p;
+    if (!/[\u0600-\u06FF]/.test(p) || r.kind === "video" || r.kind === "image" || puterLow()) return r.kind === "text" || !/[\u0600-\u06FF]/.test(p) ? p : await toEnglishFree(p);
     try { return textOf(await P.chat([{ role: "system", content: "Translate the user's text to English. Output only the translation, nothing else." }, { role: "user", content: p }])).trim() || p; }
     catch { return p; }
   };
