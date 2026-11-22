@@ -317,7 +317,21 @@ async function toEnglishFree(t) {   // ترجمة مجانية بدون Puter (�
 
 // ===== فيديو حقيقي مجاني عبر Hugging Face Spaces (GPU عندهم، والحصة اليومية تُحسب على المستعمل نفسه) =====
 const HF_SPACES = ["https://lightricks-ltx-2-3.hf.space", "https://lightricks-ltx-video-distilled.hf.space"];
-const findUrl = x => { if (!x) return ""; if (typeof x === "string") return /^https?:.*\.(mp4|webm)(\?|$)/i.test(x) ? x : ""; if (typeof x === "object") { if (typeof x.url === "string" && /^https?:/.test(x.url) && !/\.(png|jpe?g|webp)(\?|$)/i.test(x.url)) return x.url; for (const k of Object.keys(x)) { const u = findUrl(x[k]); if (u) return u; } } return ""; };
+const isVid = s => /\.(mp4|webm|mov|mkv)(\?|$)/i.test(s || "");
+const findUrl = (x, base = "") => {
+  const cand = [];
+  const walk = o => { if (!o) return; if (typeof o === "string") { cand.push({ s: o }); return; }
+    if (typeof o === "object") { if (o.url || o.path) cand.push({ s: o.url || "", p: o.path || "", v: /video/i.test(o.mime_type || "") || isVid(o.orig_name) }); for (const k of Object.keys(o)) walk(o[k]); } };
+  walk(x);
+  for (const c of cand) {
+    for (const s of [c.s, c.p]) {
+      if (!s || !(isVid(s) || c.v)) continue;
+      if (/^https?:/.test(s)) return s;
+      if (s.startsWith("/")) return base + "/gradio_api/file=" + s;
+    }
+  }
+  return "";
+};
 async function hfGenerate(prompt, seconds, size, onStatus) {
   let last = "";
   for (const base of HF_SPACES) {
@@ -344,8 +358,8 @@ async function hfGenerate(prompt, seconds, size, onStatus) {
       const blocks = txt.split(/\n\n+/);
       const done = blocks.find(b => /^event: complete/m.test(b)), err = blocks.find(b => /^event: error/m.test(b));
       if (!done) throw new Error(err ? (err.split("data:")[1] || "").trim() || "خطأ" : "لم يصل ناتج");
-      const url = findUrl(JSON.parse(done.split("data:").slice(1).join("data:")));
-      if (!url) throw new Error("لم أجد الفيديو في الناتج");
+      const out = JSON.parse(done.split("data:").slice(1).join("data:")), url = findUrl(out, base);
+      if (!url) throw new Error("لم أجد الفيديو في الناتج: " + JSON.stringify(out).slice(0, 300));
       return url;
     } catch (e) { last = String(e?.message || e); }
   }
