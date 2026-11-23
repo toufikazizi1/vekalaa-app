@@ -260,7 +260,35 @@ async function loadFFmpeg(status) {
   });
   return (_ff = ff);
 }
+async function mergeRealtime(urls, status) {
+  const blobs = [];
+  for (let i = 0; i < urls.length; i++) { status(`تنزيل المقطع ${i + 1} / ${urls.length}…`); blobs.push(URL.createObjectURL(await (await fetch(urls[i])).blob())); }
+  const v = document.createElement("video"); v.playsInline = true; v.preload = "auto"; v.src = blobs[0];
+  await new Promise((ok, no) => { v.onloadedmetadata = ok; v.onerror = () => no(new Error("تعذر قراءة المقطع")); });
+  const W = v.videoWidth, H = v.videoHeight, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d"), ac = new (window.AudioContext || window.webkitAudioContext)(), dest = ac.createMediaStreamDestination();
+  ac.createMediaElementSource(v).connect(dest);
+  const stream = cv.captureStream(30); dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+  const mime = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "";
+  const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 6e6 } : {}), chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const stopped = new Promise(ok => (rec.onstop = ok));
+  let alive = true; const draw = () => { if (!alive) return; ctx.drawImage(v, 0, 0, W, H); requestAnimationFrame(draw); };
+  let lock = null; try { lock = await navigator.wakeLock?.request("screen"); } catch {}
+  rec.start(1000); draw();
+  for (let i = 0; i < blobs.length; i++) {
+    status(`أدمج المقطع ${i + 1} / ${blobs.length} (يأخذ مدة الفيديو نفسها، لا تغلق الصفحة)…`);
+    v.src = blobs[i]; await v.play();
+    await new Promise(ok => (v.onended = ok));
+  }
+  alive = false; rec.stop(); await stopped; try { lock?.release(); ac.close(); } catch {}
+  const type = (rec.mimeType || mime || "video/webm").split(";")[0];
+  return URL.createObjectURL(new Blob(chunks, { type }));
+}
 async function mergeClips(urls, status) {
+  try { return await mergeFF(urls, status); } catch (e) { status("المكتبة السريعة غير متاحة، أدمج بالطريقة البديلة…"); return mergeRealtime(urls, status); }
+}
+async function mergeFF(urls, status) {
   const ff = await loadFFmpeg(status), { fetchFile } = window.FFmpegUtil;
   let list = "";
   for (let i = 0; i < urls.length; i++) {
