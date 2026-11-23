@@ -85,6 +85,12 @@ const STORY_STYLES = {
   story_cinema:  { art: "cinematic photorealistic film still, dramatic lighting, shallow depth of field, 35mm, highly detailed, ", plan: "a short cinematic story" },
   story_ad:      { art: "professional commercial product photography, studio lighting, clean elegant background, premium advertising shot, ", plan: "a short product commercial: each scene shows a different benefit or angle of the product" },
 };
+const isLimitImg = img => {   // صورة "Free limit reached" الصفراء من Pollinations
+  try { const c = document.createElement("canvas"); c.width = c.height = 48; const x = c.getContext("2d"); x.drawImage(img, 0, 0, 48, 48);
+    const d = x.getImageData(0, 0, 48, 48).data; let y = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 150 && d[i + 2] < 140 && d[i] - d[i + 2] > 90) y++;
+    return y / (48 * 48) > 0.5; } catch { return false; }
+};
 const untainted = d => { try { const c = document.createElement("canvas"); c.width = c.height = 2; const x = c.getContext("2d"); x.drawImage(d, 0, 0, 2, 2); x.getImageData(0, 0, 1, 1); return true; } catch { return false; } };
 async function toDrawable(img) {
   try { await img.decode?.(); } catch {}
@@ -214,8 +220,13 @@ async function storyVideo(j, r, w, P, textOf, toEnglish, fail) {
           markLow(); usePoll = true; show("رصيد Puter خلص، أستعمل الخدمة البديلة (أبطأ: صورة كل 45 ثانية). لا تغلق الصفحة.");
         }
       }
-      await sleep(window.__POLL_PAUSE ?? 46000);
-      return await new Promise((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => rej(new Error("الخدمة البديلة مشغولة")); i.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1e9)}&nologo=true`; });
+      for (let t = 0; t < 4; t++) {
+        await sleep(window.__POLL_PAUSE ?? 46000);
+        const img = await new Promise((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => rej(new Error("الخدمة البديلة مشغولة")); i.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1e9)}&nologo=true`; });
+        if (!isLimitImg(img)) return img;
+        show("الخدمة المجانية للصور مزدحمة، أنتظر وأعيد المحاولة… لا تغلق الصفحة.");
+      }
+      throw new Error("خدمة الصور المجانية رفضت الطلب (حد الاستعمال). جرّب بعد قليل.");
     };
     for (let k = 0; k < scenes.length; k++) {
       show(`أرسم المشهد ${k + 1} / ${scenes.length}… لا تغلق الصفحة ولا تطفئ الشاشة.`);
