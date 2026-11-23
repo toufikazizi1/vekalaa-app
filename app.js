@@ -360,12 +360,19 @@ const findUrl = (x, base = "") => {
   }
   return "";
 };
+const hfTok = () => { try { return (localStorage.getItem("hf_token") || "").trim(); } catch { return ""; } };
+async function hfFetch(url, opt = {}) {
+  const t = hfTok();
+  if (!t) return fetch(url, opt);
+  try { return await fetch(url, { ...opt, headers: { ...(opt.headers || {}), authorization: "Bearer " + t } }); }
+  catch (e) { return fetch(url, opt); }   // إذا منع المتصفح الترويسة نكمل بدون توكن
+}
 async function hfGenerate(prompt, seconds, size, onStatus) {
   let last = "";
   for (const base of HF_SPACES) {
     try {
       onStatus("أتصل بخدمة الفيديو…");
-      const info = await (await fetch(base + "/gradio_api/info")).json();
+      const info = await (await hfFetch(base + "/gradio_api/info")).json();
       const eps = info.named_endpoints || {};
       const name = Object.keys(eps).find(k => /generate|video/i.test(k)) || Object.keys(eps)[0];
       if (!name) throw new Error("الخدمة غير متاحة");
@@ -380,9 +387,9 @@ async function hfGenerate(prompt, seconds, size, onStatus) {
         return p.parameter_has_default ? p.parameter_default : null;
       });
       onStatus("أرسلت الوصف… قد يمر في الطابور من نصف دقيقة إلى بضع دقائق. لا تغلق الصفحة.");
-      const ev = await (await fetch(`${base}/gradio_api/call/${name.replace(/^\//, "")}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) })).json();
+      const ev = await (await hfFetch(`${base}/gradio_api/call/${name.replace(/^\//, "")}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) })).json();
       if (!ev.event_id) throw new Error("رفضت الخدمة الطلب");
-      const txt = await (await fetch(`${base}/gradio_api/call/${name.replace(/^\//, "")}/${ev.event_id}`)).text();
+      const txt = await (await hfFetch(`${base}/gradio_api/call/${name.replace(/^\//, "")}/${ev.event_id}`)).text();
       const blocks = txt.split(/\n\n+/);
       const done = blocks.find(b => /^event: complete/m.test(b)), err = blocks.find(b => /^event: error/m.test(b));
       if (!done) throw new Error(err ? (err.split("data:")[1] || "").trim() || "خطأ" : "لم يصل ناتج");
@@ -629,3 +636,5 @@ const first = st.agents.find(a => a.tier !== "premium") || st.agents[0];
 if (first) { st.sel = first.id; $("vopts").hidden = first.type !== "video"; $("sel").textContent = `الوكيل: ${first.icon} ${first.name}`; }
 renderAgents();
 st.user = await be.init(); load();
+
+try { const ti = document.getElementById("hftoken"); if (ti) { ti.value = localStorage.getItem("hf_token") || ""; ti.onchange = () => localStorage.setItem("hf_token", ti.value.trim()); } } catch {}
