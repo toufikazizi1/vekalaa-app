@@ -271,7 +271,7 @@ async function loadFFmpeg(status) {
   });
   return (_ff = ff);
 }
-async function mergeRealtime(urls, status) {
+async function mergeRealtime(urls, status, maxSec = 0) {
   const blobs = [];
   for (let i = 0; i < urls.length; i++) { status(`تنزيل المقطع ${i + 1} / ${urls.length}…`); blobs.push(URL.createObjectURL(await (await fetch(urls[i])).blob())); }
   const v = document.createElement("video"); v.playsInline = true; v.preload = "auto"; v.src = blobs[0];
@@ -286,11 +286,12 @@ async function mergeRealtime(urls, status) {
   const stopped = new Promise(ok => (rec.onstop = ok));
   let alive = true; const draw = () => { if (!alive) return; ctx.drawImage(v, 0, 0, W, H); requestAnimationFrame(draw); };
   let lock = null; try { lock = await navigator.wakeLock?.request("screen"); } catch {}
-  rec.start(1000); draw();
+  rec.start(1000); draw(); const t0 = performance.now();
   for (let i = 0; i < blobs.length; i++) {
     status(`أدمج المقطع ${i + 1} / ${blobs.length} (يأخذ مدة الفيديو نفسها، لا تغلق الصفحة)…`);
+    if (maxSec && (performance.now() - t0) / 1000 >= maxSec) break;
     v.src = blobs[i]; await v.play();
-    await new Promise(ok => (v.onended = ok));
+    await new Promise(ok => { v.onended = ok; if (maxSec) { const left = maxSec - (performance.now() - t0) / 1000; setTimeout(ok, Math.max(200, left * 1000)); } });
   }
   alive = false; rec.stop(); await stopped; try { lock?.release(); ac.close(); } catch {}
   const type = (rec.mimeType || mime || "video/webm").split(";")[0];
@@ -384,9 +385,10 @@ const epScore = (name, ep) => {
   const retVideo = rs.some(r => /video/i.test(JSON.stringify([r.label, r.component, r.type])));
   return (hasPrompt ? 4 : 0) + (retVideo ? 4 : 0) + (/generate|infer|run|predict/i.test(name) ? 1 : 0) - (/update|change|ratio|resolution|example|toggle|dimension|size|set_|reset|clear/i.test(name) ? 5 : 0);
 };
+const myServer = () => { try { return (localStorage.getItem("my_gpu_url") || "").trim().replace(/\/+$/, ""); } catch { return ""; } };
 async function hfGenerate(prompt, seconds, size, onStatus) {
   let last = "";
-  for (const base of HF_SPACES) {
+  for (const base of [myServer(), ...HF_SPACES].filter(Boolean)) {
     try {
       onStatus("أتصل بخدمة الفيديو…");
       const info = await (await hfFetch(base + "/gradio_api/info")).json();
@@ -427,6 +429,52 @@ async function hfGenerate(prompt, seconds, size, onStatus) {
   }
   throw new Error(last || "تعذّر");
 }
+// ===== لقطات حقيقية مجانية من Pexels (بدون GPU) =====
+const pexKey = () => { try { return (localStorage.getItem("pexels_key") || "").trim(); } catch { return ""; } };
+async function stockClips(query, total, portrait, onStatus) {
+  const key = pexKey(); if (!key) throw new Error("ضع مفتاح Pexels المجاني في الخانة أولاً (pexels.com/api).");
+  const urls = []; let sum = 0; const seen = new Set();
+  const variants = ["", " close up", " wide shot", " slow motion", " aerial", " people"];
+  for (let k = 0; k < variants.length && sum < total; k++) {
+    onStatus(`أبحث عن لقطات (${k + 1}/${variants.length})…`);
+    const r = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(query + variants[k])}&orientation=${portrait ? "portrait" : "landscape"}&per_page=15&page=${1 + (k % 2)}`, { headers: { Authorization: key } });
+    if (r.status === 401 || r.status === 403) throw new Error("مفتاح Pexels غير صحيح.");
+    const d = await r.json();
+    for (const v of d.videos || []) {
+      if (sum >= total || seen.has(v.id)) continue;
+      const f = (v.video_files || []).filter(x => /mp4/.test(x.file_type || "") && x.width).sort((p, q) => Math.abs(p.width - 720) - Math.abs(q.width - 720))[0];
+      if (!f) continue;
+      seen.add(v.id); urls.push(f.link); sum += v.duration || 8;
+    }
+  }
+  if (!urls.length) throw new Error("لم أجد لقطات لهذا الوصف. جرّب كلمات أبسط (مثلاً: غابة، بحر، مدينة).");
+  return urls;
+}
+function stockMedia(j, r, force = false) {
+  if (!force && imgCache[j.id]) return imgCache[j.id];
+  let started = []; try { started = JSON.parse(localStorage.getItem("stock_started") || "[]"); } catch {}
+  const age = Date.now() - (j.created_ts || Date.parse(j.created_at) || 0);
+  if (!force && (started.includes(j.id) || age > 180000)) {
+    const box = imgCache[j.id] = el("div", { className: "muted" }, "لم يُحفظ ناتج هذه المهمة. ", el("button", { textContent: "▶ إعادة التوليد", onclick: () => { const nw = stockMedia(j, r, true); box.replaceWith(nw); } }));
+    return box;
+  }
+  started.push(j.id); try { localStorage.setItem("stock_started", JSON.stringify(started.slice(-300))); } catch {}
+  const w = imgCache[j.id] = el("div", { className: "muted", textContent: "جارٍ التجهيز…" });
+  let urls = [];
+  (async () => {
+    const en = await toEnglishFree(r.prompt), total = r.total || 30;
+    urls = await stockClips(en, total, r.size !== "1280x720", t => { w.textContent = t; });
+    try { return await mergeRealtime(urls, t => { w.textContent = t; }, total); }
+    catch { return null; }
+  })().then(out => {
+    w.className = "";
+    if (out) { w.replaceChildren(el("video", { src: out, controls: true, playsInline: true, style: "max-width:100%;border-radius:10px;display:block" }), el("a", { href: out, download: "video.mp4", textContent: "⬇ تحميل الفيديو الكامل" })); }
+    else { w.replaceChildren(el("div", { className: "muted", textContent: "تعذّر دمجها في ملف واحد، هذه المقاطع تُعرض بالتتابع:" }), playlist(urls)); }
+  }).catch(err => {
+    w.className = "err"; w.replaceChildren("فشل: " + String(err?.message || err) + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } }));
+  });
+  return w;
+}
 function hfMedia(j, r, force = false) {
   if (!force && imgCache[j.id]) return imgCache[j.id];
   let started = []; try { started = JSON.parse(localStorage.getItem("hf_started") || "[]"); } catch {}
@@ -462,6 +510,7 @@ const imgCache = {};
 // الصور المجانية عبر Puter.js: تُولَّد في متصفح المستخدم وتُحسب على حسابه المجاني عندهم (لا تكلفة عليك)
 function puterMedia(j, r, force = false) {
   if (r.hf) return hfMedia(j, r, force);
+  if (r.stock) return stockMedia(j, r, force);
   if (!force && imgCache[j.id]) return imgCache[j.id];
   // لا نولّد تلقائياً عند تحديث الصفحة أو لمهام قديمة (كان يستهلك الرصيد ويُظهر نافذة Puter كل مرة)
   let started = []; try { started = JSON.parse(localStorage.getItem("puter_started") || "[]"); } catch {}
@@ -665,3 +714,5 @@ renderAgents();
 st.user = await be.init(); load();
 
 try { const ti = document.getElementById("hftoken"); if (ti) { ti.value = localStorage.getItem("hf_token") || ""; ti.onchange = () => localStorage.setItem("hf_token", ti.value.trim()); } } catch {}
+
+try { for (const [id, k] of [["pexkey", "pexels_key"], ["myurl", "my_gpu_url"]]) { const i = document.getElementById(id); if (i) { i.value = localStorage.getItem(k) || ""; i.onchange = () => localStorage.setItem(k, i.value.trim()); } } } catch {}
