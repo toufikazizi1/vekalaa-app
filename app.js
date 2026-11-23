@@ -412,11 +412,15 @@ async function hfGenerate(prompt, seconds, size, onStatus) {
           const txt = await (await hfFetch(`${base}/gradio_api/call/${path}/${ev.event_id}`)).text();
           const blocks = txt.split(/\n\n+/);
           const done = blocks.find(b => /^event: complete/m.test(b)), err = blocks.find(b => /^event: error/m.test(b));
-          if (!done) throw new Error(err ? (err.split("data:")[1] || "").trim() || "خطأ" : "لم يصل ناتج");
+          if (!done) {
+            const em = err ? (err.split("data:")[1] || "").trim().replace(/^"|"$/g, "") : "";
+            const dbg = ` [${name}: ${(eps[name].parameters || []).map(p => p.label || p.parameter_name).join(" | ")}]`;
+            throw new Error((!em || em === "null") ? "رفضت الخدمة الطلب بدون تفاصيل (غالباً الحصة اليومية المجانية خلصت أو الخدمة مزدحمة)." + dbg : em + dbg);
+          }
           const out = JSON.parse(done.split("data:").slice(1).join("data:")), url = findUrl(out, base);
           if (!url) throw new Error("لم أجد الفيديو في الناتج: " + JSON.stringify(out).slice(0, 300));
           return url;
-        } catch (e) { last = String(e?.message || e); if (/quota|gpu|exceed/i.test(last)) throw e; }
+        } catch (e) { last = String(e?.message || e); if (/quota|gpu|exceed|الحصة/i.test(last)) throw e; }
       }
       throw new Error(last);
     } catch (e) { last = String(e?.message || e); if (/quota|gpu|exceed/i.test(last)) break; }
@@ -447,9 +451,9 @@ function hfMedia(j, r, force = false) {
     if (urls.length < Math.ceil((r.total || 5) / 10)) w.append(el("div", { className: "muted", textContent: `اكتمل ${urls.length} مقطع فقط، لأن الحصة المجانية اليومية من Hugging Face خلصت.` }));
     be.setResult?.(j.id, { kind: "video", url: urls[0] });
   }).catch(err => {
-    const m = String(err?.message || err), quota = /quota|gpu|exceed|queue|busy/i.test(m);
+    const m = String(err?.message || err), quota = /quota|gpu|exceed|queue|busy|الحصة/i.test(m);
     w.className = "err";
-    w.replaceChildren(quota ? "حصتك المجانية اليوم من خدمة الفيديو خلصت أو الخدمة مزدحمة (حد من Hugging Face). جرّب بعد ساعات. " : "فشل التوليد: " + m + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } }));
+    w.replaceChildren(quota ? "حصتك المجانية اليوم من خدمة الفيديو خلصت أو الخدمة مزدحمة (حد من Hugging Face). جرّب بعد ساعات، أو ضع توكن حسابك. تفاصيل: " + m + " " : "فشل التوليد: " + m + " ", el("button", { textContent: "إعادة المحاولة", onclick: () => { delete imgCache[j.id]; load(); } }));
   });
   return w;
 }
