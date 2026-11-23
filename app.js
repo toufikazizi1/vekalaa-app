@@ -378,6 +378,12 @@ async function hfFetch(url, opt = {}) {
   try { return await fetch(url, { ...opt, headers: { ...(opt.headers || {}), authorization: "Bearer " + t } }); }
   catch (e) { return fetch(url, opt); }   // إذا منع المتصفح الترويسة نكمل بدون توكن
 }
+const epScore = (name, ep) => {
+  const ps = ep.parameters || [], rs = ep.returns || [];
+  const hasPrompt = ps.some(p => /prompt/i.test((p.label || "") + (p.parameter_name || "")) && !/negative/i.test((p.label || "") + (p.parameter_name || "")));
+  const retVideo = rs.some(r => /video/i.test(JSON.stringify([r.label, r.component, r.type])));
+  return (hasPrompt ? 4 : 0) + (retVideo ? 4 : 0) + (/generate|infer|run|predict/i.test(name) ? 1 : 0) - (/update|change|ratio|resolution|example|toggle|dimension|size|set_|reset|clear/i.test(name) ? 5 : 0);
+};
 async function hfGenerate(prompt, seconds, size, onStatus) {
   let last = "";
   for (const base of HF_SPACES) {
@@ -385,29 +391,35 @@ async function hfGenerate(prompt, seconds, size, onStatus) {
       onStatus("أتصل بخدمة الفيديو…");
       const info = await (await hfFetch(base + "/gradio_api/info")).json();
       const eps = info.named_endpoints || {};
-      const name = Object.keys(eps).find(k => /generate|video/i.test(k)) || Object.keys(eps)[0];
-      if (!name) throw new Error("الخدمة غير متاحة");
+      const names = Object.keys(eps).sort((x, y) => epScore(y, eps[y]) - epScore(x, eps[x])).slice(0, 3);
+      if (!names.length) throw new Error("الخدمة غير متاحة");
       const [W, H] = size === "1280x720" ? [768, 512] : [512, 768];
-      const data = eps[name].parameters.map(p => {
-        const lab = String(p.label || p.parameter_name || "").toLowerCase();
-        if (/negative/.test(lab)) return p.parameter_has_default ? p.parameter_default : "";
-        if (/prompt/.test(lab)) return prompt;
-        if (/duration/.test(lab)) return seconds;
-        if (/^width/.test(lab)) return W;
-        if (/^height/.test(lab)) return H;
-        return p.parameter_has_default ? p.parameter_default : null;
-      });
-      onStatus("أرسلت الوصف… قد يمر في الطابور من نصف دقيقة إلى بضع دقائق. لا تغلق الصفحة.");
-      const ev = await (await hfFetch(`${base}/gradio_api/call/${name.replace(/^\//, "")}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) })).json();
-      if (!ev.event_id) throw new Error("رفضت الخدمة الطلب");
-      const txt = await (await hfFetch(`${base}/gradio_api/call/${name.replace(/^\//, "")}/${ev.event_id}`)).text();
-      const blocks = txt.split(/\n\n+/);
-      const done = blocks.find(b => /^event: complete/m.test(b)), err = blocks.find(b => /^event: error/m.test(b));
-      if (!done) throw new Error(err ? (err.split("data:")[1] || "").trim() || "خطأ" : "لم يصل ناتج");
-      const out = JSON.parse(done.split("data:").slice(1).join("data:")), url = findUrl(out, base);
-      if (!url) throw new Error("لم أجد الفيديو في الناتج: " + JSON.stringify(out).slice(0, 300));
-      return url;
-    } catch (e) { last = String(e?.message || e); }
+      for (const name of names) {
+        try {
+          const data = eps[name].parameters.map(p => {
+            const lab = String(p.label || p.parameter_name || "").toLowerCase();
+            if (/negative/.test(lab)) return p.parameter_has_default ? p.parameter_default : "";
+            if (/prompt/.test(lab)) return prompt;
+            if (/duration/.test(lab)) return seconds;
+            if (/^width/.test(lab)) return W;
+            if (/^height/.test(lab)) return H;
+            return p.parameter_has_default ? p.parameter_default : null;
+          });
+          onStatus("أرسلت الوصف… قد يمر في الطابور من نصف دقيقة إلى بضع دقائق. لا تغلق الصفحة.");
+          const path = name.replace(/^\//, "");
+          const ev = await (await hfFetch(`${base}/gradio_api/call/${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) })).json();
+          if (!ev.event_id) throw new Error("رفضت الخدمة الطلب");
+          const txt = await (await hfFetch(`${base}/gradio_api/call/${path}/${ev.event_id}`)).text();
+          const blocks = txt.split(/\n\n+/);
+          const done = blocks.find(b => /^event: complete/m.test(b)), err = blocks.find(b => /^event: error/m.test(b));
+          if (!done) throw new Error(err ? (err.split("data:")[1] || "").trim() || "خطأ" : "لم يصل ناتج");
+          const out = JSON.parse(done.split("data:").slice(1).join("data:")), url = findUrl(out, base);
+          if (!url) throw new Error("لم أجد الفيديو في الناتج: " + JSON.stringify(out).slice(0, 300));
+          return url;
+        } catch (e) { last = String(e?.message || e); if (/quota|gpu|exceed/i.test(last)) throw e; }
+      }
+      throw new Error(last);
+    } catch (e) { last = String(e?.message || e); if (/quota|gpu|exceed/i.test(last)) break; }
   }
   throw new Error(last || "تعذّر");
 }
